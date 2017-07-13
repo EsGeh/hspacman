@@ -16,7 +16,6 @@ import Prelude hiding(Left,Right)
 import Graphics.Gloss hiding(display)
 import Graphics.Gloss.Interface.Pure.Game hiding(Up,Down)
 import qualified Graphics.Gloss.Interface.Pure.Game as G
-import qualified Graphics.Gloss as G
 
 import System.Random
 import Control.Monad.Random
@@ -24,10 +23,14 @@ import Control.Monad.Random
 import Data.Tuple
 import Data.List
 
+windowTitle :: String
 windowTitle = "hsPacMan"
-windowPos = (100, 100)  :: PosOnScreen
-windowSize = (800, 600) :: SizeOnScreen
+windowPos :: PosOnScreen
+windowPos = (100, 100) 
+windowSize :: SizeOnScreen
+windowSize = (800, 600)
 
+main :: IO ()
 main = play
 	display
 	bgColour
@@ -37,30 +40,34 @@ main = play
 	handleInput
 	moveWorld
 
+display :: Display
 display = InWindow windowTitle (vecMap floor windowSize) (vecMap floor windowPos)
+bgColour :: Color
 bgColour = black
+framerate :: Int
 framerate = 40
 
+startWorld :: Int -> World
 startWorld seed = World {
-    uiState=Menu,
-    level=1,
-    points=0,
-    labyrinth=genLabyrinth (40,30) 0.4 seed,
-    pacman=Object{pos=(1, 1), size=pacManSize, direction=(0,0), t=0, state=() },
-    ghosts=ghosts,
-    dots=undefined,
-    fruits=undefined,
-    dbgInfo = DbgInf{ info = "test\ntest" },
-    keys = []
+    world_uiState=Menu,
+    world_level=1,
+    world_points=0,
+    world_labyrinth=genLabyrinth (40,30) 0.4 seed,
+    world_pacman=Object{obj_pos=(1, 1), obj_size=pacManSize, obj_direction=(0,0), obj_t=0, obj_state=() },
+    world_ghosts=ghosts,
+    world_dots=undefined,
+    world_fruits=undefined,
+    world_dbgInfo = DbgInf{ info = "test\ntest" },
+    world_keys = []
 }
 	where
 		pacManSize = (0.7,0.7)
 		ghosts = [
-			Object{ pos=(0,0), size=pacManSize, direction=(0,0), t=0, state=GhostState { rndState= mkStdGen seed } }]
+			Object{ obj_pos=(0,0), obj_size=pacManSize, obj_direction=(0,0), obj_t=0, obj_state=GhostState { rndState= mkStdGen seed } }]
 
 handleInput :: Event -> World -> World
 handleInput event world = case event of
-	(EventKey key upOrDown _ _) -> case (uiState world) of
+	(EventKey key upOrDown _ _) -> case (world_uiState world) of
 		Menu -> case upOrDown of
 			G.Down -> case key of
 				Char 's' -> setUIState (startWorld 8) Playing
@@ -68,69 +75,69 @@ handleInput event world = case event of
 			_ -> world --alternative menue
 		Playing -> case upOrDown of
 			G.Down -> case key of
-				Char 'w' -> world{ keys= addDir Up }
-				Char 's' -> world{ keys= addDir Down }
-				Char 'a' -> world{ keys= addDir Left }
-				Char 'd' -> world{ keys= addDir Right }
+				Char 'w' -> world{ world_keys= addDir Up }
+				Char 's' -> world{ world_keys= addDir Down }
+				Char 'a' -> world{ world_keys= addDir Left }
+				Char 'd' -> world{ world_keys= addDir Right }
 				SpecialKey KeySpace -> setPacDir world (0,0)
 				_ -> world
 			G.Up -> case key of
-				Char 'w' -> world{ keys= remDir Up }
-				Char 's' -> world{ keys= remDir Down }
-				Char 'a' -> world{ keys= remDir Left }
-				Char 'd' -> world{ keys= remDir Right }
+				Char 'w' -> world{ world_keys= remDir Up }
+				Char 's' -> world{ world_keys= remDir Down }
+				Char 'a' -> world{ world_keys= remDir Left }
+				Char 'd' -> world{ world_keys= remDir Right }
 				SpecialKey KeySpace -> setPacDir world (0,0)
 				_ -> world
 		where
 			addDir dir = [dir] `union` (remDir $ opposite dir)
 			remDir dir = filter (/=dir) currentKeys
-			currentKeys = keys world
+			currentKeys = world_keys world
 	_ -> world
 
 
 setUIState :: World -> UIState -> World
-setUIState world state = world {uiState = state}
+setUIState world state = world {world_uiState = state}
 
 -- |changes the moving direction of the pacman
 setPacDir :: World -> SpeedF -> World
-setPacDir world dir = world {pacman = (pacman world) {direction=dir}}
+setPacDir world dir = world { world_pacman = (world_pacman world) {obj_direction=dir}}
 
 moveWorld :: DeltaT -> World -> World
 moveWorld deltaT world = (movePacman deltaT) $ (moveGhosts deltaT) world
 
 moveGhosts :: DeltaT -> World -> World
-moveGhosts dt world =
-	world{
-		ghosts= map (moveCharacter dt world . setDirection world) (ghosts world),
-		dbgInfo=DbgInf{ info= show $ possibleDirections (labyrinth world) dt (head $ ghosts world ) }
+moveGhosts dt world0 =
+	world0{
+		world_ghosts= map (moveCharacter dt world0 . setDirection world0) (world_ghosts world0),
+		world_dbgInfo= DbgInf{ info= show $ possibleDirections (world_labyrinth world0) dt (head $ world_ghosts world0 ) }
 	}
 	where
 		--monsterSpeed = (fromIntegral $ level world)
 		-- this function is the ai for the ghosts
 		setDirection :: World -> Ghost -> Ghost
 		setDirection world ghost = ghost{
-			direction= direction $ pacman world,
-			--direction= vecMap fromIntegral $ directionsToSpeed [newDir],
-			state = state ghost
-			--state = GhostState{ rndState=newRndState }
+			obj_direction= obj_direction $ world_pacman world,
+			--obj_direction= vecMap fromIntegral $ directionsToSpeed [newDir],
+			obj_state = obj_state ghost
+			--obj_state = GhostState{ rndState=newRndState }
 		}
 			where
-				(newDir,newRndState) = runRand rndDir (rndState $ state ghost)
-				rndDir = randomDirS possibleDirs [(head $ speedToDirection $ direction ghost,0.98)]
-				possibleDirs = possibleDirections (labyrinth world) dt ghost
-				pacManObj= pacman world
+				(newDir,newRndState) = runRand rndDir (rndState $ obj_state ghost)
+				rndDir = randomDirS possibleDirs [(head $ speedToDirection $ obj_direction ghost,0.98)]
+				possibleDirs = possibleDirections (world_labyrinth world) dt ghost
+				pacManObj= world_pacman world
 
 
 movePacman :: DeltaT -> World -> World
-movePacman dt world@World{ pacman=pacMan } =
+movePacman dt world@World{ world_pacman=pacMan } =
 	world {
-		pacman = moveCharacter dt world $ setDirection pacMan
+		world_pacman = moveCharacter dt world $ setDirection pacMan
 		--,
 		--dbgInfo=DbgInf{ info=dbgText} }
 	}
 	where
 		setDirection :: Pacman -> Pacman
-		setDirection obj = obj{ direction = speed *| (vecMap fromIntegral $ directionsToSpeed $ keys world) }
+		setDirection obj = obj{ obj_direction = speed *| (vecMap fromIntegral $ directionsToSpeed $ world_keys world) }
 		{-dbgText =
 			"pos pacMan: " ++ (show $ vecMap floor $ pos pacMan) ++ "\n" ++
 			"pos pacMan exact: " ++ (show $ pos pacMan) ++ "\n" {-++
@@ -138,52 +145,37 @@ movePacman dt world@World{ pacman=pacMan } =
 		speed = 2
 
 moveCharacter :: DeltaT -> World -> Object st -> Object st
-moveCharacter dt world obj = obj{ pos=newPos, t= (t obj + dt) }
+moveCharacter dt world obj = obj{ obj_pos=newPos, obj_t= (obj_t obj + dt) }
 	where
 		
-		newPos = if (willCollide (labyrinth world) dt obj)
-			then pos obj
-			else (pointInSizeF labSize $ pos obj |+| (direction obj) |* dt) -- pointInSize: torus
+		newPos = if (willCollide (world_labyrinth world) dt obj)
+			then obj_pos obj
+			else (pointInSizeF labSize $ obj_pos obj |+| (obj_direction obj) |* dt) -- pointInSize: torus
 				where
 					labSize = vecMap fromIntegral (mGetWidth lab -1,mGetHeight lab -1)
-					lab = labyrinth world
+					lab = world_labyrinth world
 
 possibleDirections :: Labyrinth -> DeltaT -> Object st -> [Direction]
-possibleDirections lab deltaT obj = filter (not . willCollide lab deltaT . (\x -> obj{ direction= x }) . directionToSpeed) $
+possibleDirections lab deltaT obj =
+	filter (not . willCollide lab deltaT . (\x -> obj{ obj_direction= x }) . directionToSpeed) $
 	allDirs
 
 willCollide :: Labyrinth -> DeltaT -> Object st -> Bool
 willCollide lab deltaT obj =
 	or $
-	map (willPointCollide lab deltaT (direction obj)) $
+	map (willPointCollide lab deltaT (obj_direction obj)) $
 	[ p , p |+| (0,h), p |+| (w,h), p |+| (w,0) ]
 	where
-		p = pos obj
-		(w,h) = size obj
+		p = obj_pos obj
+		(w,h) = obj_size obj
 
 willPointCollide :: Labyrinth -> Float -> SpeedF -> PosF -> Bool
 willPointCollide lab deltaT dir oldPos =
 	(==Wall) $ mGet (calcMatrIndex nextPos) lab 
 	where
 		calcMatrIndex :: PosF -> MatrIndex
-		calcMatrIndex nextPos = swap $
+		calcMatrIndex pos = swap $
 			vecMap floor $
-			pointInSizeF (fromIntegral $ mGetWidth lab -1, fromIntegral $ mGetHeight lab -1) nextPos -- torus
+			pointInSizeF (fromIntegral $ mGetWidth lab -1, fromIntegral $ mGetHeight lab -1) pos -- torus
 		nextPos :: PosF
 		nextPos = (oldPos |+| dir |* deltaT)
-
-{-possibleDirections :: Labyrinth -> Object -> [Direction]
-possibleDirections lab obj = filter (objCanMoveThere lab obj) allDirs
-
-objCanMoveThere :: Labyrinth -> Object -> Direction -> Bool
-objCanMoveThere lab obj@Object{ pos=pos, size=size } dir =
-	--foldl (&&) True $ 
-	and $
-	map ((==Free) . directionToTerritory lab dir . vecMap floor) [pos] --[pos,pos+size]
-
--- |used to check wether it is possible for a moving object to proceed moving in the current direction
-directionToTerritory :: Labyrinth -> Direction -> Pos -> Territory
-directionToTerritory lab dir pos = mGet (swap newPos) lab
-	where
-		newPos = movePoint (mGetWidth lab,mGetHeight lab) pos (directionToSpeed dir)
-		-}

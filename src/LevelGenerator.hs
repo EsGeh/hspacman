@@ -3,17 +3,15 @@ module LevelGenerator(
 ) where
 
 import GameData --hiding(Direction)
-import SGData.Vector2D
+--import SGData.Vector2D
 import RandomUtils
 import Prelude hiding(Left,Right)
 import Data.Tuple
 import qualified Data.Foldable as F
+import Control.Monad.Identity
 
---import Math.Matrix
 import SGData.Matrix
---import Numeric.Probability.Distribution
 import Control.Monad.Random
-import System.Random
 import Data.Maybe( fromJust )
 
 
@@ -26,9 +24,9 @@ genLabyrinth (width,height) wallRatio seed =
 
 -- a field with wall on all cells 
 massiveField :: Size -> Labyrinth
-massiveField (width,height) = fromJust $ mFromListRow $ take height $ repeat lines
+massiveField (width,height) = fromJust $ mFromListRow $ take height $ repeat line
 	where
-		lines = take width $ repeat Wall :: [Territory]
+		line = replicate width Wall :: [Territory]
 
 -- bore tunnels until the wall ratio has been reached:
 randomTunnels :: (RandomGen g) => Labyrinth -> Float -> Rand g Labyrinth
@@ -46,6 +44,12 @@ randomTunnels lab wallRatio = if currentWallRatio <= wallRatio then return lab e
 		--toInt Free = 0
 
 -- bore one tunnel:
+boreTunnel ::
+	RandomGen g =>
+	Size
+	-> Direction
+	-> Matrix Territory
+	-> RandT g Identity (Matrix Territory)
 boreTunnel pos0 favDir matr = calcNewMatr (wormBehaviour (favDir,0.95)) pos0 matr WS{ lastDir=favDir }
 
 -- |this is what a worm sees at every iteration:
@@ -60,6 +64,12 @@ type Behaviour st g a = (View st a -> Rand g (a,Maybe Movement,st))
 {- allows a simple automaton ("worm") to work on a matrix
 a "worm" is defined by its Behaviour...
 -}
+calcNewMatr ::
+	Behaviour t g a
+	-> Size
+	-> Matrix a
+	-> t
+	-> RandT g Identity (Matrix a)
 calcNewMatr beh pos0 matr st = do
 	(newMatr, mov, st') <- oneStep beh pos0 matr st
 	case mov of
@@ -84,7 +94,7 @@ data WormStatus = WS {
 -- until it reaches a free field.
 -}
 wormBehaviour :: (RandomGen g) => (Direction,Rational) -> (Behaviour WormStatus g Territory)
-wormBehaviour dirAndProp@(favDir,_) (mat,pos,WS{ lastDir=lastDir }) = do
+wormBehaviour dirAndProp@(favDir,_) (mat, pos, WS{ lastDir=lastDir_ }) = do
 	rndDir <- randomDirS (favDir:(orthogonal favDir)) [dirAndProp]
 	return $ (Free,maybeDir rndDir,WS{ lastDir = rndDir })
 	where
@@ -94,20 +104,13 @@ wormBehaviour dirAndProp@(favDir,_) (mat,pos,WS{ lastDir=lastDir }) = do
 			(mGet (swap rightPos) mat)/=Free 
 			then Just $ rndDir
 			else Nothing
-		[forwardPos,leftPos,rightPos] = map (movePoint (mGetWidth mat,mGetHeight mat) pos . directionToSpeed) [lastDir, leftOf lastDir, rightOf lastDir]
-
-
-{-
--- calculates a list of random values from a given distribution
-weightedList :: RandomGen g => g -> [(a, Rational)] -> [a]
-weightedList gen weights = evalRand m gen
-	where m = sequence . repeat . fromList $ weights
--}
-
+		[forwardPos,leftPos,rightPos] = map (movePoint (mGetWidth mat,mGetHeight mat) pos . directionToSpeed) [lastDir_, leftOf lastDir_, rightOf lastDir_]
 
 -- tests if a position is inside a given area:
+{-
 inBox :: Area -> Pos -> Bool
 inBox (posBox,sizeBox) pos = (pos `vecGOE` posBox) && (pos `vecSOE` (posBox |+| sizeBox))
 	where
 		vecGOE l r = (vecX l >= vecX r) && (vecY l >= vecY r)
 		vecSOE l r = (vecX l <= vecX r) && (vecY l <= vecY r)
+-}

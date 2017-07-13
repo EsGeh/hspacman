@@ -1,9 +1,7 @@
 module RandomUtils where
 
-
-
 import Control.Monad.Random
-import System.Random
+--import System.Random
 
 import GameData
 

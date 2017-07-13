@@ -1,16 +1,10 @@
 module GameData where
 
 import SGData.Vector2D
---import Vector2D
-import Graphics.Gloss hiding(Point)
 import SGData.Matrix
---import Math.Matrix
---import Numeric.LinearAlgebra.Data
--- import qualified Numeric.LinearAlgebra.Data as Lina
 
 import Prelude hiding(Left,Right)
 import Data.Fixed
-import Data.Typeable
 
 import System.Random
 
@@ -26,11 +20,13 @@ opposite Right = Left
 opposite Up = Down
 opposite Down = Up
 
+leftOf :: Direction -> Direction
 leftOf Left = Down
 leftOf Up = Left
 leftOf Right = Up
 leftOf Down = Right
 
+rightOf :: Direction -> Direction
 rightOf Left = Up
 rightOf Up = Right
 rightOf Right = Down
@@ -39,6 +35,7 @@ rightOf Down = Left
 orthogonal :: Direction -> [Direction]
 orthogonal d = [ ret | ret<-allDirs, ret/=d, ret/=opposite d ]
 
+allDirs :: [Direction]
 allDirs = [Up,Down,Left,Right]
 -- |Movement on Labyrinth
 type Movement = Direction
@@ -55,16 +52,16 @@ type Time = Float
 type DeltaT = Float
 
 data World = World {
-	uiState :: UIState,
-	keys :: CurrentKeys,
-	level :: Level,
-	points :: Points,
-	labyrinth :: Labyrinth,
-	pacman :: Pacman,
-	ghosts :: [Ghost],
-	dots :: [Dot],
-	fruits :: [Fruit],
-	dbgInfo :: DebugInfo
+	world_uiState :: UIState,
+	world_keys :: CurrentKeys,
+	world_level :: Level,
+	world_points :: Points,
+	world_labyrinth :: Labyrinth,
+	world_pacman :: Pacman,
+	world_ghosts :: [Ghost],
+	world_dots :: [Dot],
+	world_fruits :: [Fruit],
+	world_dbgInfo :: DebugInfo
 }
 	-- deriving(Show)
 
@@ -83,18 +80,17 @@ instance Enum Territory where
 	toEnum int = case int of
 		0 -> Free
 		1 -> Wall
+		_ -> error "Territory enum error"
 	fromEnum ter = case ter of
 		Free -> 0
 		Wall -> 1
 
 data Object objState = Object {
-	pos :: PosF,
-	size :: SizeF,
-	--speed :: Float , 
-	direction :: SpeedF,
-	t :: Time,
-	state :: objState
-	--direction :: Direction
+	obj_pos :: PosF,
+	obj_size :: SizeF,
+	obj_direction :: SpeedF,
+	obj_t :: Time,
+	obj_state :: objState
 } deriving(Show)
 
 data GhostState = GhostState {
@@ -108,65 +104,11 @@ type Ghost = Object GhostState
 
 data UIState = Playing | Menu deriving(Show)
 
-{-
-data World = World {
-	settings :: Settings,
-	game :: GameData
-}
 
-data Settings = Settings {
-	uiState :: UIState,
-	gameState :: GameState
-}
-
-
-data GameState = GameState {
-	level :: Level,
-	points :: Points
-} -}
-
-{-
-data GameData = GameData {
-	labyrinth :: Labyrinth,
-	items :: Items,
-	characters :: Characters
-} -}
-
-
-{- data Items = Items {
-	dots :: Object,
-	fruits :: Object
-} -}
-
-{-
-data Characters = Characters {
-	pacMan :: MovableObj,
-	monsters :: [MovableObj]
-}
-
-data Object = Object {
-	objParams :: ObjParams,
-	renderParams :: RenderParams
-}
-
-data ObjParams = ObjParams {
-	pos :: PosF
-}
-
-data RenderParams = RenderParams {
-	pic :: Picture
-}
-
-data MovableObj = MovableObj {
-	obj :: Object,
-	movableParams :: MovableParams
-} 
-
-data MovableParams = MovableParams {
-	speed :: SpeedF
-} -}
+directionsToSpeed :: Num a => [Direction] -> Vec a
 directionsToSpeed = foldl (|+|) (0,0) . map directionToSpeed
 
+directionToSpeed :: Num a => Direction -> Vec a
 directionToSpeed Up = (0,-1)
 directionToSpeed Down = (0,1)
 directionToSpeed Left = (-1,0)
@@ -179,36 +121,26 @@ speedToDirection speed =
 			1 -> [Right]
 			(-1) -> [Left]
 			0 -> []
+			_ -> error "internal error"
 		yDir = case (signum $ vecY speed) of
 			1 -> [Down]
 			(-1) -> [Up]
 			0 -> []
+			_ -> error "internal error"
 	in
 		xDir ++ yDir
 
-{-rest :: (Num a, Integral m) => a -> m -> a
-rest val m = case (cast val :: Maybe Int) of
-	Just i -> i `mod` m
-	_ -> case (cast val :: (Real a)=> a) of
-		Just f -> f mod' m
-		_ -> error "type not found!"
--}
-	
-{-
-rest :: (Integral a) => a -> a -> a
-rest = mod
-
-restF :: (Real f) => f -> f -> f
-restF = mod'
--}
-
+pointInSize :: Size -> Pos -> Size
 pointInSize (width,height) (x,y)  = (x `mod` width, y `mod` height)
 --pointInSize size pos = fOnVec (mod size) pos
 --pointInSizeF size pos = fOnVec (mod' size) pos
+pointInSizeF :: SizeF -> PosF -> SizeF
 pointInSizeF (width,height) (x,y)  = (x `mod'` width, y `mod'` height)
 
-movePoint size pos dir = pointInSize size (pos |+| dir)
-movePointF size pos dir = pointInSizeF size (pos |+| dir)
+movePoint :: Size -> Pos -> Speed -> Pos
+movePoint size_ pos_ dir = pointInSize size_ (pos_ |+| dir)
+movePointF :: SizeF -> PosF -> SpeedF -> PosF
+movePointF size_ pos_ dir = pointInSizeF size_ (pos_ |+| dir)
 
 -- realizes a "torus like" behavior for positions on the field
 {-getNeighbourIndex :: Size -> MatrIndex -> Movement -> MatrIndex

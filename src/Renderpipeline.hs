@@ -1,7 +1,7 @@
 module Renderpipeline where
 
 import GameData
-import LevelGenerator
+--import LevelGenerator
 import SGData.Vector2D
 --import Math.Matrix
 import SGData.Matrix
@@ -9,7 +9,7 @@ import qualified Data.Foldable as F -- enables folds over matrices
 import Data.Tuple
 
 import Graphics.Gloss hiding(display)
-import qualified Graphics.Gloss as G
+--import qualified Graphics.Gloss as G
 
 -- used to represent coordinates relative to an area on the screen:
 -- (0,0)..(1,1)
@@ -35,7 +35,7 @@ type GlossCoords = Vec Float
 
 
 renderWorld :: WindowSize -> World -> Picture
-renderWorld wSize world = case (uiState world) of
+renderWorld wSize world = case (world_uiState world) of
 	Menu -> renderMenu wSize menuArea world
 	Playing -> renderGame wSize dbgTextArea gameArea world
 	where
@@ -45,7 +45,7 @@ renderWorld wSize world = case (uiState world) of
 		textAreaWidth = 200
 
 renderMenu :: WindowSize -> DestAreaOnScreen -> World -> Picture
-renderMenu wSize destArea world = Color yellow $ Polygon $
+renderMenu wSize destArea _ = Color yellow $ Polygon $
 	map (normalizedPosToGloss wSize destArea) $ rect (0,0) (1,1)
 
 renderGame :: WindowSize -> DestAreaOnScreen -> DestAreaOnScreen -> World -> Picture
@@ -57,43 +57,43 @@ renderGame wSize dbgTextArea gameArea world = Pictures $ [
 renderGameArea :: WindowSize -> DestAreaOnScreen -> World -> Picture
 renderGameArea wSize destArea world = Pictures [
 	Color white $ Line (fmap (normalizedPosToGloss wSize destArea) $ rect (0,0) (1,1)),
-	renderLabyrinth wSize destArea cellSize (labyrinth world),
-	renderPacMan wSize destArea cellSize (pacman world),
-	renderGhosts wSize destArea cellSize (ghosts world) ]
+	renderLabyrinth wSize destArea cellSize (world_labyrinth world),
+	renderPacMan wSize destArea cellSize (world_pacman world),
+	renderGhosts wSize destArea cellSize (world_ghosts world) ]
 	where
 		cellSize :: SizeF
 		cellSize = (1,1) |/| (fromIntegral $ mGetWidth lab, fromIntegral $ mGetHeight lab)
-		lab = labyrinth world 
+		lab = world_labyrinth world 
 
 
 renderPacMan :: WindowSize -> DestAreaOnScreen -> SizeF -> Pacman -> Picture
-renderPacMan wSize gameArea@(fieldPos,fieldSize) cellSize pacman =
+renderPacMan wSize gameArea cellSize pacman =
 	renderChar wSize gameArea cellSize pacman $
 	Translate (1/2) (-1/2) $
 	Color yellow $
 	--Rotate 90 $ -- roation doesn't work due to a bug in gloss!!
 	ThickArc (mouthAngle/2) (-mouthAngle/2) (1/4) (1/2)
 	where
-		mouthAngle = 90 * (sin $ 5 * t pacman)
+		mouthAngle = 90 * (sin $ 5 * obj_t pacman)
 
 renderGhosts :: WindowSize -> DestAreaOnScreen -> SizeF -> [Ghost] -> Picture
-renderGhosts wSize gameArea@(fieldPos,fieldSize) cellSize ghosts = Pictures $ map (renderGhost wSize gameArea cellSize) ghosts
+renderGhosts wSize gameArea cellSize ghosts = Pictures $ map (renderGhost wSize gameArea cellSize) ghosts
 	
 	
 renderGhost :: WindowSize -> DestAreaOnScreen -> SizeF -> Ghost -> Picture
-renderGhost wSize gameArea@(fieldPos,fieldSize) cellSize ghost = renderChar wSize gameArea cellSize ghost$
+renderGhost wSize gameArea cellSize ghost = renderChar wSize gameArea cellSize ghost$
 	Translate (0) (-1) $
 	--Translate (1/2) (-1/2) $
 	Color green $
 	(Polygon $ rect (0,0) (1,1))
 	where
-		mouthAngle = 90 * (sin $ 5 * t ghost)
+		--mouthAngle = 90 * (sin $ 5 * obj_t ghost)
 
 
 renderChar :: WindowSize -> DestAreaOnScreen -> SizeF -> Object st -> Picture -> Picture
-renderChar wSize gameArea@(fieldPos,fieldSize) cellSize obj pic =
-	(uncurry Translate) (normalizedPosToGloss wSize gameArea (cellSize |*| (pos obj))) $
-	(uncurry Scale) (size obj) $
+renderChar wSize gameArea cellSize obj pic =
+	(uncurry Translate) (normalizedPosToGloss wSize gameArea (cellSize |*| (obj_pos obj))) $
+	(uncurry Scale) (obj_size obj) $
 	(uncurry Scale) (normalizedPosToScreen gameArea cellSize |-| normalizedPosToScreen gameArea (0,0)) $
 	pic
 	{-Translate (1/2) (-1/2) $
@@ -101,7 +101,7 @@ renderChar wSize gameArea@(fieldPos,fieldSize) cellSize obj pic =
 	--Rotate 90 $ -- roation doesn't work due to a bug in gloss!!
 	ThickArc (mouthAngle/2) (-mouthAngle/2) (1/4) (1/2)
 	where
-		mouthAngle = 90 * (sin $ 5 * t obj)-}
+		mouthAngle = 90 * (sin $ 5 * obj_t obj)-}
 
 
 
@@ -112,12 +112,12 @@ renderLabyrinth wSize destArea cellSize lab = Pictures $ F.foldr (:)[] $ mapWith
         -- in order to display the matrix correctly the lines/columns have to be flipped when drawing
 		drawCell :: MatrIndex -> Territory -> Picture
 		drawCell coords = drawCell' (swap coords)
-		drawCell' coords ter = case ter of
+		drawCell' coords0 ter = case ter of
 			Free -> Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
 			Wall -> Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
 	    		where
-				posCell = posFromCoords coords
-				sizeCell= posFromCoords (coords |+| (1,1)) |-| posCell
+				posCell = posFromCoords coords0
+				sizeCell= posFromCoords (coords0 |+| (1,1)) |-| posCell
 				posFromCoords coords = normalizedPosToGloss wSize destArea $ vecMap fromIntegral coords |*| cellSize
 
 
@@ -127,10 +127,10 @@ rect pos (w,h) = [ pos, pos|+|(0,h), pos|+|(w,h), pos|+|(w,0), pos ]
 
 
 renderDbgText :: WindowSize -> DestAreaOnScreen -> World -> Picture
-renderDbgText wSize destArea world = renderLines 0 $ lines $ info $ dbgInfo world
+renderDbgText wSize destArea world = renderLines 0 $ lines $ info $ world_dbgInfo world
 	where
 		renderLines :: Float -> [String] -> Picture
-		renderLines yPos lines = case lines of
+		renderLines yPos lines' = case lines' of
 			[] -> Blank
 			(x:xs) -> Pictures $ [
 				(uncurry Translate) (normalizedPosToGloss wSize destArea (0,0.1+yPos)) $
@@ -139,7 +139,7 @@ renderDbgText wSize destArea world = renderLines 0 $ lines $ info $ dbgInfo worl
 				Text x,
 				renderLines (yPos+lineHeight) xs ]
 			where lineHeight = min 
-				((1-yPos) / (fromIntegral $ length lines))
+				((1-yPos) / (fromIntegral $ length lines'))
 				0.1
 
 -- coordinate translaters:
