@@ -1,8 +1,12 @@
 module GameData where
 
-import Vector2D
+import SGData.Vector2D
+--import Vector2D
 import Graphics.Gloss hiding(Point)
-import Math.Matrix
+import SGData.Matrix
+--import Math.Matrix
+--import Numeric.LinearAlgebra.Data
+-- import qualified Numeric.LinearAlgebra.Data as Lina
 
 import Prelude hiding(Left,Right)
 import Data.Fixed
@@ -12,6 +16,8 @@ import System.Random
 
 -- |Directions in Labyrinth
 data Direction = Up | Down | Right | Left deriving (Eq, Show)
+
+-- type Matrix = Lina.Matrix
 
 
 opposite :: Direction -> Direction
@@ -59,7 +65,8 @@ data World = World {
 	dots :: [Dot],
 	fruits :: [Fruit],
 	dbgInfo :: DebugInfo
-} deriving(Show)
+}
+	-- deriving(Show)
 
 type CurrentKeys = [Direction]
 
@@ -158,7 +165,7 @@ data MovableObj = MovableObj {
 data MovableParams = MovableParams {
 	speed :: SpeedF
 } -}
-directionsToSpeed = foldl (<+>) (0,0) . map directionToSpeed
+directionsToSpeed = foldl (|+|) (0,0) . map directionToSpeed
 
 directionToSpeed Up = (0,-1)
 directionToSpeed Down = (0,1)
@@ -200,8 +207,8 @@ pointInSize (width,height) (x,y)  = (x `mod` width, y `mod` height)
 --pointInSizeF size pos = fOnVec (mod' size) pos
 pointInSizeF (width,height) (x,y)  = (x `mod'` width, y `mod'` height)
 
-movePoint size pos dir = pointInSize size (pos <+> dir)
-movePointF size pos dir = pointInSizeF size (pos <+> dir)
+movePoint size pos dir = pointInSize size (pos |+| dir)
+movePointF size pos dir = pointInSizeF size (pos |+| dir)
 
 -- realizes a "torus like" behavior for positions on the field
 {-getNeighbourIndex :: Size -> MatrIndex -> Movement -> MatrIndex

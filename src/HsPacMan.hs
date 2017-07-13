@@ -3,8 +3,10 @@ module Main where
 import GameData
 import LevelGenerator
 import Renderpipeline
-import Vector2D
-import Math.Matrix
+import SGData.Vector2D hiding ( (*|), (|*) )
+import Vector2D ( (*|), (|*) )
+--import Vector2D
+import SGData.Matrix
 import RandomUtils
 
 import Prelude hiding(Left,Right)
@@ -35,7 +37,7 @@ main = play
 	handleInput
 	moveWorld
 
-display = InWindow windowTitle (fOnVec floor windowSize) (fOnVec floor windowPos)
+display = InWindow windowTitle (vecMap floor windowSize) (vecMap floor windowPos)
 bgColour = black
 framerate = 40
 
@@ -60,15 +62,8 @@ handleInput :: Event -> World -> World
 handleInput event world = case event of
 	(EventKey key upOrDown _ _) -> case (uiState world) of
 		Menu -> case upOrDown of
-		  	G.Down -> case key of
-			-- Offnen: Menu hat entweder Punkte die durch einen Cursor ausgewählt werden
-			-- oder: Menu hat Optionen die durch bestimmte Tasten ausgelöst werden.
-				{-SpecialKey KeyEnter -> undefined    -- menuepunkt auswählen
-				SpecialKey KeyUp -> undefined       -- einen menupunkt hoeher
-				SpecialKey KeyDown -> undefined     -- einen menupunkt tiefer
-				SpecialKey KeyEsc -> undefined    -- spiel verlassen-}
+			G.Down -> case key of
 				Char 's' -> setUIState (startWorld 8) Playing
-				Char 'p' -> undefined -- TODO: pause
 				_ -> world --alternative menue
 			_ -> world --alternative menue
 		Playing -> case upOrDown of
@@ -78,18 +73,19 @@ handleInput event world = case event of
 				Char 'a' -> world{ keys= addDir Left }
 				Char 'd' -> world{ keys= addDir Right }
 				SpecialKey KeySpace -> setPacDir world (0,0)
-				--_ -> world --alternative playing
+				_ -> world
 			G.Up -> case key of
 				Char 'w' -> world{ keys= remDir Up }
 				Char 's' -> world{ keys= remDir Down }
 				Char 'a' -> world{ keys= remDir Left }
 				Char 'd' -> world{ keys= remDir Right }
 				SpecialKey KeySpace -> setPacDir world (0,0)
+				_ -> world
 		where
 			addDir dir = [dir] `union` (remDir $ opposite dir)
 			remDir dir = filter (/=dir) currentKeys
 			currentKeys = keys world
-	_ -> world --alternative playing
+	_ -> world
 
 
 setUIState :: World -> UIState -> World
@@ -114,7 +110,7 @@ moveGhosts dt world =
 		setDirection :: World -> Ghost -> Ghost
 		setDirection world ghost = ghost{
 			direction= direction $ pacman world,
-			--direction= fOnVec fromIntegral $ directionsToSpeed [newDir],
+			--direction= vecMap fromIntegral $ directionsToSpeed [newDir],
 			state = state ghost
 			--state = GhostState{ rndState=newRndState }
 		}
@@ -134,9 +130,9 @@ movePacman dt world@World{ pacman=pacMan } =
 	}
 	where
 		setDirection :: Pacman -> Pacman
-		setDirection obj = obj{ direction = speed *> (fOnVec fromIntegral $ directionsToSpeed $ keys world) }
+		setDirection obj = obj{ direction = speed *| (vecMap fromIntegral $ directionsToSpeed $ keys world) }
 		{-dbgText =
-			"pos pacMan: " ++ (show $ fOnVec floor $ pos pacMan) ++ "\n" ++
+			"pos pacMan: " ++ (show $ vecMap floor $ pos pacMan) ++ "\n" ++
 			"pos pacMan exact: " ++ (show $ pos pacMan) ++ "\n" {-++
 			"possibleDirs: " ++ show possibleDirs-} -}
 		speed = 2
@@ -147,28 +143,34 @@ moveCharacter dt world obj = obj{ pos=newPos, t= (t obj + dt) }
 		
 		newPos = if (willCollide (labyrinth world) dt obj)
 			then pos obj
-			else (pointInSizeF labSize $ pos obj <+> (direction obj) <* dt) -- pointInSize: torus
+			else (pointInSizeF labSize $ pos obj |+| (direction obj) |* dt) -- pointInSize: torus
 				where
-					labSize = fOnVec fromIntegral (mGetWidth lab -1,mGetHeight lab -1)
+					labSize = vecMap fromIntegral (mGetWidth lab -1,mGetHeight lab -1)
 					lab = labyrinth world
 
 possibleDirections :: Labyrinth -> DeltaT -> Object st -> [Direction]
 possibleDirections lab deltaT obj = filter (not . willCollide lab deltaT . (\x -> obj{ direction= x }) . directionToSpeed) $
 	allDirs
 
-willCollide lab deltaT obj = or $ map (willPointCollide lab deltaT (direction obj)) $
-	[ p , p <+> (0,h), p <+> (w,h), p <+> (w,0) ]
+willCollide :: Labyrinth -> DeltaT -> Object st -> Bool
+willCollide lab deltaT obj =
+	or $
+	map (willPointCollide lab deltaT (direction obj)) $
+	[ p , p |+| (0,h), p |+| (w,h), p |+| (w,0) ]
 	where
 		p = pos obj
 		(w,h) = size obj
 
-willPointCollide lab deltaT dir oldPos = (==Wall) $ mGet (calcMatrIndex nextPos) lab 
+willPointCollide :: Labyrinth -> Float -> SpeedF -> PosF -> Bool
+willPointCollide lab deltaT dir oldPos =
+	(==Wall) $ mGet (calcMatrIndex nextPos) lab 
 	where
 		calcMatrIndex :: PosF -> MatrIndex
 		calcMatrIndex nextPos = swap $
-			fOnVec floor $
+			vecMap floor $
 			pointInSizeF (fromIntegral $ mGetWidth lab -1, fromIntegral $ mGetHeight lab -1) nextPos -- torus
-		nextPos = (oldPos <+> dir <* deltaT)
+		nextPos :: PosF
+		nextPos = (oldPos |+| dir |* deltaT)
 
 {-possibleDirections :: Labyrinth -> Object -> [Direction]
 possibleDirections lab obj = filter (objCanMoveThere lab obj) allDirs
@@ -177,7 +179,7 @@ objCanMoveThere :: Labyrinth -> Object -> Direction -> Bool
 objCanMoveThere lab obj@Object{ pos=pos, size=size } dir =
 	--foldl (&&) True $ 
 	and $
-	map ((==Free) . directionToTerritory lab dir . fOnVec floor) [pos] --[pos,pos+size]
+	map ((==Free) . directionToTerritory lab dir . vecMap floor) [pos] --[pos,pos+size]
 
 -- |used to check wether it is possible for a moving object to proceed moving in the current direction
 directionToTerritory :: Labyrinth -> Direction -> Pos -> Territory

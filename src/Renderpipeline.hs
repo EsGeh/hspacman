@@ -2,8 +2,9 @@ module Renderpipeline where
 
 import GameData
 import LevelGenerator
-import Vector2D
-import Math.Matrix
+import SGData.Vector2D
+--import Math.Matrix
+import SGData.Matrix
 import qualified Data.Foldable as F -- enables folds over matrices
 import Data.Tuple
 
@@ -38,7 +39,7 @@ renderWorld wSize world = case (uiState world) of
 	Menu -> renderMenu wSize menuArea world
 	Playing -> renderGame wSize dbgTextArea gameArea world
 	where
-		gameArea = ((textAreaWidth,0), wSize <-> (textAreaWidth,0))
+		gameArea = ((textAreaWidth,0), wSize |-| (textAreaWidth,0))
 		dbgTextArea = ((0,0),    (textAreaWidth,vecY wSize))
 		menuArea = ((0,0),wSize)
 		textAreaWidth = 200
@@ -61,7 +62,7 @@ renderGameArea wSize destArea world = Pictures [
 	renderGhosts wSize destArea cellSize (ghosts world) ]
 	where
 		cellSize :: SizeF
-		cellSize = (1,1) </> (fromIntegral $ mGetWidth lab, fromIntegral $ mGetHeight lab)
+		cellSize = (1,1) |/| (fromIntegral $ mGetWidth lab, fromIntegral $ mGetHeight lab)
 		lab = labyrinth world 
 
 
@@ -91,9 +92,9 @@ renderGhost wSize gameArea@(fieldPos,fieldSize) cellSize ghost = renderChar wSiz
 
 renderChar :: WindowSize -> DestAreaOnScreen -> SizeF -> Object st -> Picture -> Picture
 renderChar wSize gameArea@(fieldPos,fieldSize) cellSize obj pic =
-	(uncurry Translate) (normalizedPosToGloss wSize gameArea (cellSize <*> (pos obj))) $
+	(uncurry Translate) (normalizedPosToGloss wSize gameArea (cellSize |*| (pos obj))) $
 	(uncurry Scale) (size obj) $
-	(uncurry Scale) (normalizedPosToScreen gameArea cellSize <-> normalizedPosToScreen gameArea (0,0)) $
+	(uncurry Scale) (normalizedPosToScreen gameArea cellSize |-| normalizedPosToScreen gameArea (0,0)) $
 	pic
 	{-Translate (1/2) (-1/2) $
 	Color yellow $
@@ -116,12 +117,12 @@ renderLabyrinth wSize destArea cellSize lab = Pictures $ F.foldr (:)[] $ mapWith
 			Wall -> Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
 	    		where
 				posCell = posFromCoords coords
-				sizeCell= posFromCoords (coords <+> (1,1)) <-> posCell
-				posFromCoords coords = normalizedPosToGloss wSize destArea $ fOnVec fromIntegral coords <*> cellSize
+				sizeCell= posFromCoords (coords |+| (1,1)) |-| posCell
+				posFromCoords coords = normalizedPosToGloss wSize destArea $ vecMap fromIntegral coords |*| cellSize
 
 
 rect :: NormalCoords -> NormalSize -> [NormalCoords]
-rect pos (w,h) = [ pos, pos<+>(0,h), pos<+>(w,h), pos<+>(w,0), pos ]
+rect pos (w,h) = [ pos, pos|+|(0,h), pos|+|(w,h), pos|+|(w,0), pos ]
 
 
 
@@ -147,7 +148,7 @@ normalizedPosToGloss :: WindowSize -> DestAreaOnScreen -> NormalCoords -> GlossC
 normalizedPosToGloss wSize destArea pos = toGloss wSize $ normalizedPosToScreen destArea pos
 
 normalizedPosToScreen :: DestAreaOnScreen -> NormalCoords -> PosOnScreen
-normalizedPosToScreen (posOnScr,sizeOnScr) pos = posOnScr <+> pos <*> sizeOnScr
+normalizedPosToScreen (posOnScr,sizeOnScr) pos = posOnScr |+| pos |*| sizeOnScr
 
 {- game programmers are used to (0,0) to be in the left upper corner of the screen,
 -- and (ScreenWidth,ScreenHeight) to be the right bottom corner.
@@ -155,7 +156,7 @@ normalizedPosToScreen (posOnScr,sizeOnScr) pos = posOnScr <+> pos <*> sizeOnScr
 -- x-Axis and y-Axis pointint right/up (like in math)
 -}
 toGloss :: WindowSize -> PosOnScreen -> GlossCoords
-toGloss wSize pos = (pos <-> (wSize </ 2)) <*> (1,-1)
+toGloss wSize pos = (pos |-| (wSize |/ 2)) |*| (1,-1)
 
 fromGloss :: WindowSize -> GlossCoords -> PosOnScreen
-fromGloss wSize pos = pos <*> (1,-1) <+> (wSize </2)
+fromGloss wSize pos = pos |*| (1,-1) |+| (wSize |/ 2)

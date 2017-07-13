@@ -1,5 +1,10 @@
 module Vector2D where
 
+import SGData.Vector2D hiding ( (*|), (|*) )
+
+{-
+import Prelude hiding( (*>) )
+
 import Data.Tuple
 
 type Vec a = (a,a)
@@ -34,3 +39,8 @@ vec </ scalar = ((vecX vec) / scalar, (vecY vec) / scalar)
 
 transpose :: Vec a -> Vec a
 transpose x = swap x 
+-}
+
+scalar *| vec = (scalar * (vecX vec), scalar * (vecY vec))
+(|*) :: (Num a) => Vec a -> a -> Vec a
+(|*) = flip (*|)

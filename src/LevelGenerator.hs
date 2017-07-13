@@ -3,16 +3,18 @@ module LevelGenerator(
 ) where
 
 import GameData --hiding(Direction)
-import Vector2D
+import SGData.Vector2D
 import RandomUtils
 import Prelude hiding(Left,Right)
 import Data.Tuple
 import qualified Data.Foldable as F
 
-import Math.Matrix
+--import Math.Matrix
+import SGData.Matrix
 --import Numeric.Probability.Distribution
 import Control.Monad.Random
 import System.Random
+import Data.Maybe( fromJust )
 
 
 -- create a labyrinth by spawning worms on a field that is massive in the beginning:
@@ -24,9 +26,9 @@ genLabyrinth (width,height) wallRatio seed =
 
 -- a field with wall on all cells 
 massiveField :: Size -> Labyrinth
-massiveField (width,height) = mUnsafe (take height $ repeat lines)
+massiveField (width,height) = fromJust $ mFromListRow $ take height $ repeat lines
 	where
-		lines = take width $ repeat Wall
+		lines = take width $ repeat Wall :: [Territory]
 
 -- bore tunnels until the wall ratio has been reached:
 randomTunnels :: (RandomGen g) => Labyrinth -> Float -> Rand g Labyrinth
@@ -105,7 +107,7 @@ weightedList gen weights = evalRand m gen
 
 -- tests if a position is inside a given area:
 inBox :: Area -> Pos -> Bool
-inBox (posBox,sizeBox) pos = (pos `vecGOE` posBox) && (pos `vecSOE` (posBox <+> sizeBox))
+inBox (posBox,sizeBox) pos = (pos `vecGOE` posBox) && (pos `vecSOE` (posBox |+| sizeBox))
 	where
 		vecGOE l r = (vecX l >= vecX r) && (vecY l >= vecY r)
 		vecSOE l r = (vecX l <= vecX r) && (vecY l <= vecY r)
