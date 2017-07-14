@@ -11,8 +11,6 @@ import RandomUtils
 
 import Prelude hiding(Left,Right)
 
-import Prelude hiding(Left,Right)
-
 import Graphics.Gloss hiding(display)
 import Graphics.Gloss.Interface.Pure.Game hiding(Up,Down)
 import qualified Graphics.Gloss.Interface.Pure.Game as G
@@ -22,6 +20,7 @@ import Control.Monad.Random
 
 import Data.Tuple
 import Data.List
+
 
 windowTitle :: String
 windowTitle = "hsPacMan"
@@ -49,16 +48,16 @@ framerate = 40
 
 startWorld :: Int -> World
 startWorld seed = World {
-    world_uiState=Menu,
-    world_level=1,
-    world_points=0,
-    world_labyrinth=genLabyrinth (40,30) 0.4 seed,
-    world_pacman=Object{obj_pos=(1, 1), obj_size=pacManSize, obj_direction=(0,0), obj_t=0, obj_state=() },
-    world_ghosts=ghosts,
-    world_dots=undefined,
-    world_fruits=undefined,
-    world_dbgInfo = DbgInf{ info = "test\ntest" },
-    world_keys = []
+	world_uiState=Menu,
+	world_level=1,
+	world_points=0,
+	world_labyrinth=genLabyrinth (40,30) 0.4 seed,
+	world_pacman=Object{obj_pos=(1, 1), obj_size=pacManSize, obj_direction=(0,0), obj_t=0, obj_state=() },
+	world_ghosts=ghosts,
+	world_dots=undefined,
+	world_fruits=undefined,
+	world_dbgInfo = DbgInf{ info = "test\ntest" },
+	world_keys = []
 }
 	where
 		pacManSize = (0.7,0.7)

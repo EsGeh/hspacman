@@ -8,10 +8,21 @@ import Data.Fixed
 
 import System.Random
 
+
 -- |Directions in Labyrinth
 data Direction = Up | Down | Right | Left deriving (Eq, Show)
+type Movement = Direction
 
--- type Matrix = Lina.Matrix
+type Pos = Vec Int -- probably deprecated
+type PosF = Vec Float -- logical Position on field
+type Speed = Vec Int -- probably deprecated
+type SpeedF = Vec Float -- movement vector
+type Size = Vec Int
+type SizeF = Vec Float
+type Area = (Pos,Size)
+
+type Time = Float
+type DeltaT = Float
 
 
 opposite :: Direction -> Direction
@@ -38,18 +49,6 @@ orthogonal d = [ ret | ret<-allDirs, ret/=d, ret/=opposite d ]
 allDirs :: [Direction]
 allDirs = [Up,Down,Left,Right]
 -- |Movement on Labyrinth
-type Movement = Direction
-
-type Pos = Vec Int -- probably deprecated
-type PosF = Vec Float -- logical Position on field
-type Speed = Vec Int -- probably deprecated
-type SpeedF = Vec Float -- movement vector
-type Size = Vec Int
-type SizeF = Vec Float
-type Area = (Pos,Size)
-
-type Time = Float
-type DeltaT = Float
 
 data World = World {
 	world_uiState :: UIState,
@@ -104,7 +103,6 @@ type Ghost = Object GhostState
 
 data UIState = Playing | Menu deriving(Show)
 
-
 directionsToSpeed :: Num a => [Direction] -> Vec a
 directionsToSpeed = foldl (|+|) (0,0) . map directionToSpeed
 
@@ -132,8 +130,6 @@ speedToDirection speed =
 
 pointInSize :: Size -> Pos -> Size
 pointInSize (width,height) (x,y)  = (x `mod` width, y `mod` height)
---pointInSize size pos = fOnVec (mod size) pos
---pointInSizeF size pos = fOnVec (mod' size) pos
 pointInSizeF :: SizeF -> PosF -> SizeF
 pointInSizeF (width,height) (x,y)  = (x `mod'` width, y `mod'` height)
 
