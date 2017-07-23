@@ -13,13 +13,10 @@ import System.Random
 data Direction = Up | Down | Right | Left deriving (Eq, Show)
 type Movement = Direction
 
-type Pos = Vec Int -- probably deprecated
-type PosF = Vec Float -- logical Position on field
-type Speed = Vec Int -- probably deprecated
-type SpeedF = Vec Float -- movement vector
-type Size = Vec Int
-type SizeF = Vec Float
-type Area = (Pos,Size)
+type Pos a = Vec a
+type Speed a = Vec a
+type Size a = Vec a
+--type Area a = (Pos a, Size a)
 
 type Time = Float
 type DeltaT = Float
@@ -48,11 +45,10 @@ orthogonal d = [ ret | ret<-allDirs, ret/=d, ret/=opposite d ]
 
 allDirs :: [Direction]
 allDirs = [Up,Down,Left,Right]
--- |Movement on Labyrinth
 
 data World = World {
 	world_uiState :: UIState,
-	world_keys :: CurrentKeys,
+	world_userInput :: CurrentKeys,
 	world_level :: Level,
 	world_points :: Points,
 	world_labyrinth :: Labyrinth,
@@ -85,9 +81,9 @@ instance Enum Territory where
 		Wall -> 1
 
 data Object objState = Object {
-	obj_pos :: PosF,
-	obj_size :: SizeF,
-	obj_direction :: SpeedF,
+	obj_pos :: Pos Float,
+	obj_size :: Size Float,
+	obj_direction :: Speed Float,
 	obj_t :: Time,
 	obj_state :: objState
 } deriving(Show)
@@ -101,6 +97,14 @@ type Fruit = Object ()
 type Pacman = Object ()
 type Ghost = Object GhostState
 
+defObj pos = Object{
+	obj_pos = pos,
+	obj_size = (1,1),
+	obj_direction = (0,0),
+	obj_t = 0,
+	obj_state = ()
+}
+
 data UIState = Playing | Menu deriving(Show)
 
 directionsToSpeed :: Num a => [Direction] -> Vec a
@@ -112,7 +116,7 @@ directionToSpeed Down = (0,1)
 directionToSpeed Left = (-1,0)
 directionToSpeed Right = (1,0)
 
-speedToDirection :: SpeedF -> [Direction]
+speedToDirection :: (Eq a, Num a) => Vec a -> [Direction]
 speedToDirection speed = 
 	let 
 		xDir = case (signum $ vecX speed) of
@@ -128,15 +132,13 @@ speedToDirection speed =
 	in
 		xDir ++ yDir
 
-pointInSize :: Size -> Pos -> Size
+pointInSize :: Integral a => Size a -> Pos a -> Size a
 pointInSize (width,height) (x,y)  = (x `mod` width, y `mod` height)
-pointInSizeF :: SizeF -> PosF -> SizeF
+pointInSizeF :: (Real a) => Size a -> Pos a -> Size a
 pointInSizeF (width,height) (x,y)  = (x `mod'` width, y `mod'` height)
 
-movePoint :: Size -> Pos -> Speed -> Pos
+movePoint :: Integral a => Size a -> Pos a -> Speed a -> Pos a
 movePoint size_ pos_ dir = pointInSize size_ (pos_ |+| dir)
-movePointF :: SizeF -> PosF -> SpeedF -> PosF
-movePointF size_ pos_ dir = pointInSizeF size_ (pos_ |+| dir)
 
 -- realizes a "torus like" behavior for positions on the field
 {-getNeighbourIndex :: Size -> MatrIndex -> Movement -> MatrIndex

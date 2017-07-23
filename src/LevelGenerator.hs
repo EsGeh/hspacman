@@ -1,5 +1,6 @@
 module LevelGenerator(
-	genLabyrinth
+	genWorld
+	--genLabyrinth
 ) where
 
 import GameData --hiding(Direction)
@@ -14,17 +15,58 @@ import SGData.Matrix
 import Control.Monad.Random
 import Data.Maybe( fromJust )
 
+genWorld seed =
+	flip evalRand (mkStdGen seed) $
+	genWorld' (20,20) 0.4
+
+genWorld' ::
+	RandomGen g =>
+	Size Int -> Float
+	-> RandT g Identity World
+genWorld' worldSize wallRatio =
+	do
+		labyrinth <- genLabyrinth worldSize wallRatio
+		pacmanPos <-
+			return (0,0)
+		return $
+			World {
+				world_uiState = Menu,
+				world_level = 1,
+				world_points = 0,
+				world_labyrinth = labyrinth,
+				world_pacman =
+					(defObj pacmanPos){
+						obj_size = pacManSize,
+						obj_direction = (0,0),
+						obj_t = 0
+					},
+				world_ghosts = ghosts,
+				world_dots = [],
+				world_fruits= [],
+				world_dbgInfo = DbgInf{ info = "" },
+				world_userInput = []
+			}
+	where
+		pacManSize =
+			(1,1)
+			--(0.7,0.7)
+		ghosts = []
+			--[ Object{ obj_pos=(0,0), obj_size=pacManSize, obj_direction=(0,0), obj_t=0, obj_state=GhostState { rndState= mkStdGen seed } }]
+
 
 -- create a labyrinth by spawning worms on a field that is massive in the beginning:
-genLabyrinth :: Size -> Float -> Int -> Labyrinth
-genLabyrinth (width,height) wallRatio seed = 
-	evalRand (randomTunnels startMatrix wallRatio) (mkStdGen seed)
+genLabyrinth ::
+	RandomGen g =>
+	Size Int -> Float
+	-> RandT g Identity Labyrinth
+genLabyrinth (width,height) wallRatio = 
+	randomTunnels startMatrix wallRatio
 		where
 			startMatrix = massiveField (width,height)
 
 -- a field with wall on all cells 
-massiveField :: Size -> Labyrinth
-massiveField (width,height) = fromJust $ mFromListRow $ take height $ repeat line
+massiveField :: Size Int -> Labyrinth
+massiveField (width,height) = fromJust $ mFromListRow $ replicate height line
 	where
 		line = replicate width Wall :: [Territory]
 
@@ -40,13 +82,11 @@ randomTunnels lab wallRatio = if currentWallRatio <= wallRatio then return lab e
 		currentWallRatio = (fromIntegral countWall) / (fromIntegral $ width*height)
 		countWall = F.foldl (+) 0 (fmap fromEnum lab)
 		(width,height) = (mGetWidth lab, mGetHeight lab)
-		--toInt Wall = 1
-		--toInt Free = 0
 
 -- bore one tunnel:
 boreTunnel ::
 	RandomGen g =>
-	Size
+	Size Int
 	-> Direction
 	-> Matrix Territory
 	-> RandT g Identity (Matrix Territory)
@@ -54,7 +94,7 @@ boreTunnel pos0 favDir matr = calcNewMatr (wormBehaviour (favDir,0.95)) pos0 mat
 
 -- |this is what a worm sees at every iteration:
 --type View a st = (Matrix a, Pos)
-type View st a = (Matrix a, Pos,st)
+type View st a = (Matrix a, Pos Int, st)
 
 -- |this defines a worms behaviour:
 --type Behaviour a st = (View a st -> (a,Maybe Movement,st))
@@ -66,7 +106,7 @@ a "worm" is defined by its Behaviour...
 -}
 calcNewMatr ::
 	Behaviour t g a
-	-> Size
+	-> Size Int
 	-> Matrix a
 	-> t
 	-> RandT g Identity (Matrix a)
@@ -79,7 +119,9 @@ calcNewMatr beh pos0 matr st = do
 				newPos = movePoint (mGetWidth matr, mGetHeight matr) pos0 (directionToSpeed dir)
 
 -- |let a "worm" take exactly one step:
-oneStep :: (Behaviour st g a) -> Pos -> Matrix a -> st -> Rand g ((Matrix a), Maybe Movement,st)
+oneStep ::
+	(Behaviour st g a) -> Pos Int -> Matrix a -> st
+	-> Rand g ((Matrix a), Maybe Movement, st)
 oneStep beh pos0 matr st = do
 	(newVal,dir,st') <- beh (matr, pos0,st)
 	let newMatr = mSet (swap pos0) newVal matr 
@@ -93,7 +135,11 @@ data WormStatus = WS {
 {- defines the behaviour of a worm. The worm will roughly go to its favourite direction,
 -- until it reaches a free field.
 -}
-wormBehaviour :: (RandomGen g) => (Direction,Rational) -> (Behaviour WormStatus g Territory)
+wormBehaviour ::
+	--(MonadRandom m) =>
+	(RandomGen g) =>
+	(Direction,Rational)
+	-> (Behaviour WormStatus g Territory)
 wormBehaviour dirAndProp@(favDir,_) (mat, pos, WS{ lastDir=lastDir_ }) = do
 	rndDir <- randomDirS (favDir:(orthogonal favDir)) [dirAndProp]
 	return $ (Free,maybeDir rndDir,WS{ lastDir = rndDir })

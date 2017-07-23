@@ -12,8 +12,13 @@ randomDirS (preference,prob) = fromList $ (preference,prob) :
 	zip (orthogonal preference) (repeat $ (1-prob)/2)
 	-}
 
-randomDirS :: (RandomGen g) => [Direction] -> [(Direction,Rational)]-> Rand g Direction
-randomDirS dirList preferences = fromList $ randomDirS' dirList preferences
+randomDirS ::
+	MonadRandom m =>
+	[Direction] -> [(Direction,Rational)]
+	-> m Direction
+randomDirS dirList preferences =
+	fromList $
+	randomDirS' dirList preferences
 		
 randomDirS' :: [Direction] -> [(Direction,Rational)]-> [(Direction,Rational)]
 randomDirS' dirList preferences = 
