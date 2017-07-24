@@ -1,10 +1,10 @@
+{-# LANGUAGE RecordWildCards #-}
 module LevelGenerator(
 	genWorld
-	--genLabyrinth
 ) where
 
 import GameData --hiding(Direction)
---import SGData.Vector2D
+import SGData.Vector2D
 import RandomUtils
 import Prelude hiding(Left,Right)
 import Data.Tuple
@@ -14,20 +14,26 @@ import Control.Monad.Identity
 import SGData.Matrix
 import Control.Monad.Random
 import Data.Maybe( fromJust )
+import Control.Monad.State
+import Control.Monad.Trans.Maybe
 
 genWorld seed =
 	flip evalRand (mkStdGen seed) $
 	genWorld' (20,20) 0.4
 
 genWorld' ::
-	RandomGen g =>
+	MonadRandom m =>
 	Size Int -> Float
-	-> RandT g Identity World
+	-> m World
 genWorld' worldSize wallRatio =
 	do
 		labyrinth <- genLabyrinth worldSize wallRatio
 		pacmanPos <-
-			return (0,0)
+			-- choose random free field:
+			fmap (vecMap fromIntegral) $
+			uniform $ map swap $ 
+			filter ((==Free) . flip mGet labyrinth) $
+			mGetAllIndex labyrinth
 		return $
 			World {
 				world_uiState = Menu,
@@ -48,109 +54,112 @@ genWorld' worldSize wallRatio =
 			}
 	where
 		pacManSize =
-			(1,1)
-			--(0.7,0.7)
+			(0.7,0.7)
 		ghosts = []
 			--[ Object{ obj_pos=(0,0), obj_size=pacManSize, obj_direction=(0,0), obj_t=0, obj_state=GhostState { rndState= mkStdGen seed } }]
 
 
 -- create a labyrinth by spawning worms on a field that is massive in the beginning:
 genLabyrinth ::
-	RandomGen g =>
+	MonadRandom m =>
 	Size Int -> Float
-	-> RandT g Identity Labyrinth
+	-> m Labyrinth
 genLabyrinth (width,height) wallRatio = 
-	randomTunnels startMatrix wallRatio
-		where
-			startMatrix = massiveField (width,height)
+	randomTunnels wallRatio $
+	massiveField (width,height)
 
 -- a field with wall on all cells 
 massiveField :: Size Int -> Labyrinth
-massiveField (width,height) = fromJust $ mFromListRow $ replicate height line
+massiveField (width,height) =
+	fromJust $ mFromListRow $ replicate height line
 	where
 		line = replicate width Wall :: [Territory]
 
 -- bore tunnels until the wall ratio has been reached:
-randomTunnels :: (RandomGen g) => Labyrinth -> Float -> Rand g Labyrinth
-randomTunnels lab wallRatio = if currentWallRatio <= wallRatio then return lab else do
-	randomPos <- fromList $ zip (map swap $ mGetAllIndex lab) (repeat 1)
-	let oneStepLeft = (movePoint (mGetWidth lab,mGetHeight lab) randomPos (directionToSpeed Left))
-	lab' <- boreTunnel randomPos Right lab
-	lab'' <- boreTunnel oneStepLeft Left lab'
-	randomTunnels lab'' wallRatio -- <- recursion !
+randomTunnels :: (MonadRandom m) => Float -> Labyrinth -> m Labyrinth
+randomTunnels wallRatio lab =
+	if currentWallRatio <= wallRatio
+	then return lab
+	else
+		do
+			randomPos <- uniform $ map swap $ mGetAllIndex lab
+			let oneStepLeft = movePoint (width,height) randomPos (directionToSpeed Left)
+			lab' <-
+				boreTunnel oneStepLeft Left
+				=<<
+				boreTunnel randomPos Right lab
+			randomTunnels wallRatio lab' -- <- recursion !
 	where
 		currentWallRatio = (fromIntegral countWall) / (fromIntegral $ width*height)
-		countWall = F.foldl (+) 0 (fmap fromEnum lab)
+		countWall = sum $ fmap fromEnum lab
 		(width,height) = (mGetWidth lab, mGetHeight lab)
 
--- bore one tunnel:
 boreTunnel ::
-	RandomGen g =>
+	MonadRandom m =>
 	Size Int
 	-> Direction
-	-> Matrix Territory
-	-> RandT g Identity (Matrix Territory)
-boreTunnel pos0 favDir matr = calcNewMatr (wormBehaviour (favDir,0.95)) pos0 matr WS{ lastDir=favDir }
+	-> Labyrinth
+	-> m Labyrinth
+boreTunnel pos0 favDir matr =
+	evalStateT `flip`
+		WormStatus{
+			lastDir = favDir,
+			pos = pos0
+		} $
+		runWorm (wormStep favDir 0.95) $
+		mSet (swap pos0) Free matr
 
--- |this is what a worm sees at every iteration:
---type View a st = (Matrix a, Pos)
-type View st a = (Matrix a, Pos Int, st)
+-- runs a worm until its "dead" ( = returns "Nothing"):
+runWorm :: Monad m => (Labyrinth -> MaybeT m Labyrinth) -> Labyrinth -> m Labyrinth
+runWorm worm lab =
+	runMaybeT (worm lab) >>= \mNewLabyrinth ->
+	case mNewLabyrinth of
+		Nothing -> return $ lab
+		Just newLab -> runWorm worm $ newLab
 
--- |this defines a worms behaviour:
---type Behaviour a st = (View a st -> (a,Maybe Movement,st))
-type Behaviour st g a = (View st a -> Rand g (a,Maybe Movement,st))
-
-
-{- allows a simple automaton ("worm") to work on a matrix
-a "worm" is defined by its Behaviour...
--}
-calcNewMatr ::
-	Behaviour t g a
-	-> Size Int
-	-> Matrix a
-	-> t
-	-> RandT g Identity (Matrix a)
-calcNewMatr beh pos0 matr st = do
-	(newMatr, mov, st') <- oneStep beh pos0 matr st
-	case mov of
-		Nothing -> return newMatr
-		Just dir -> calcNewMatr beh newPos newMatr st'
-			where
-				newPos = movePoint (mGetWidth matr, mGetHeight matr) pos0 (directionToSpeed dir)
-
--- |let a "worm" take exactly one step:
-oneStep ::
-	(Behaviour st g a) -> Pos Int -> Matrix a -> st
-	-> Rand g ((Matrix a), Maybe Movement, st)
-oneStep beh pos0 matr st = do
-	(newVal,dir,st') <- beh (matr, pos0,st)
-	let newMatr = mSet (swap pos0) newVal matr 
-	return (newMatr,dir,st')
-
-
-data WormStatus = WS {
-	lastDir :: Direction
+data WormStatus = WormStatus {
+	lastDir :: Direction,
+	pos :: Pos Int
 }
 
-{- defines the behaviour of a worm. The worm will roughly go to its favourite direction,
--- until it reaches a free field.
--}
+wormStep ::
+	MonadRandom m =>
+	Direction -> Rational
+	-> Labyrinth
+	-> MaybeT (StateT WormStatus m) Labyrinth
+wormStep favDir prop matr =
+	get >>= \wormStatus ->
+	do
+		newDir <- MaybeT $ lift $ wormBehaviour favDir prop wormStatus matr
+		oldPos <- gets pos
+		let newPos = movePoint (mGetWidth matr, mGetHeight matr) oldPos . directionToSpeed $ newDir
+		put $ WormStatus{
+			lastDir = newDir,
+			pos = newPos
+		}
+		return $
+			mSet (swap newPos) Free matr
+
 wormBehaviour ::
-	--(MonadRandom m) =>
-	(RandomGen g) =>
-	(Direction,Rational)
-	-> (Behaviour WormStatus g Territory)
-wormBehaviour dirAndProp@(favDir,_) (mat, pos, WS{ lastDir=lastDir_ }) = do
-	rndDir <- randomDirS (favDir:(orthogonal favDir)) [dirAndProp]
-	return $ (Free,maybeDir rndDir,WS{ lastDir = rndDir })
-	where
-		maybeDir rndDir = if 
-			(mGet (swap forwardPos) mat)/=Free &&
-			(mGet (swap leftPos) mat)/=Free &&
-			(mGet (swap rightPos) mat)/=Free 
+	MonadRandom m =>
+	Direction -> Rational
+	-> WormStatus
+	-> Labyrinth
+	-> m (Maybe Direction)
+wormBehaviour favDir prop WormStatus{..} matr =
+	do
+		rndDir <- randomDirS (favDir:(orthogonal favDir)) [(favDir, prop)]
+		return $
+			if
+				(mGet (swap forwardPos) matr)/=Free &&
+				(mGet (swap leftPos) matr)/=Free &&
+				(mGet (swap rightPos) matr)/=Free 
 			then Just $ rndDir
 			else Nothing
-		[forwardPos,leftPos,rightPos] = map (movePoint (mGetWidth mat,mGetHeight mat) pos . directionToSpeed) [lastDir_, leftOf lastDir_, rightOf lastDir_]
+	where
+		[forwardPos, leftPos, rightPos] =
+			map (movePoint (mGetWidth matr, mGetHeight matr) pos . directionToSpeed) $
+				[lastDir, leftOf lastDir, rightOf lastDir]
 
 -- tests if a position is inside a given area:
 {-
