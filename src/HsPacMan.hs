@@ -24,9 +24,9 @@ import Data.List
 
 windowTitle :: String
 windowTitle = "hsPacMan"
-windowPos :: PosOnScreen
+windowPos :: Pos Float
 windowPos = (100, 100) 
-windowSize :: SizeOnScreen
+windowSize :: Pos Float
 windowSize = (800, 600)
 
 main :: IO ()
@@ -118,7 +118,6 @@ moveGhosts dt world0 =
 				pacManObj= world_pacman world
 -}
 
-
 movePacman :: DeltaT -> World -> World
 movePacman dt world@World{ world_pacman=pacMan } =
 	world {
@@ -132,16 +131,23 @@ movePacman dt world@World{ world_pacman=pacMan } =
 				obj_direction =
 					speed *| (vecMap fromIntegral $ directionsToSpeed $ world_userInput world)
 			}
-		dbgText = concat ["userInput: ", show $ world_userInput world ]
+		dbgText = concat $
+			[ "userInput: ", show $ world_userInput world, "\n"
+			, "pos: ", show (obj_pos pacMan), "\n"
+			, "setDirection: ", show (setDirection pacMan), "\n"
+			]
 			{-"pos pacMan: " ++ (show $ vecMap floor $ pos pacMan) ++ "\n" ++
 			"pos pacMan exact: " ++ (show $ pos pacMan) ++ "\n" {-++
 			"possibleDirs: " ++ show possibleDirs-} -}
 		speed = 2
 
 moveCharacter :: DeltaT -> World -> Object st -> Object st
-moveCharacter dt world obj = obj{ obj_pos=newPos, obj_t= (obj_t obj + dt) }
+moveCharacter dt world obj =
+	obj{
+		obj_pos=newPos,
+		obj_t= (obj_t obj + dt)
+	}
 	where
-		
 		newPos = if (willCollide (world_labyrinth world) dt obj)
 			then obj_pos obj
 			else (pointInSizeF labSize $ obj_pos obj |+| (obj_direction obj) |* dt) -- pointInSize: torus

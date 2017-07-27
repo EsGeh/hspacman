@@ -10,23 +10,12 @@ import Data.Tuple
 
 import Graphics.Gloss hiding(display)
 
--- used to represent coordinates relative to an area on the screen:
--- (0,0)..(1,1)
-type NormalCoords = Vec Float
-type NormalSize = Vec Float
-
-
--- origin is the upper left corner of the screen (x-Axis right, y-Axis dowdown
-type PosOnScreen = Vec Float
---  (0,0) .. (screenWidth,screenHeight)	
--- x right, y down
-
 type SizeOnScreen = Vec Float
-type AreaOnScreen = (PosOnScreen,SizeOnScreen)
+--type AreaOnScreen = (PosOnScreen,SizeOnScreen)
 
 -- nice aliases:
 type WindowSize = SizeOnScreen
-type DestAreaOnScreen = AreaOnScreen
+--type DestAreaOnScreen = AreaOnScreen
 
 
 -- origin is the center of the screen!, (x-Axis right, y-Axis up)
@@ -35,52 +24,91 @@ type GlossCoords = Vec Float
 
 renderWorld :: WindowSize -> World -> Picture
 renderWorld wSize world =
+	Pictures $
+	[
+		fitToArea (-1/2, -1/2) (vecX wSize, -vecY wSize) $
+		fitToArea (0,textHeight) (1, 1-textHeight) $
+		renderGame world,
+		renderDbgText wSize textArea (world_dbgInfo world)
+	]
+	where
+		gameArea :: (Vec Float, Vec Float)
+		gameArea = ((0, textHeight), wSize |-| (0,textHeight))
+		textArea :: (Vec Float, Vec Float)
+		textArea = ((0,0), (1, textHeight))
+		textHeight :: Float
+		textHeight = 0.1
+
+renderDbgText :: Vec Float -> (Vec Float, Vec Float) -> DebugInfo -> Picture
+renderDbgText wSize textArea dbgInfo =
+	Pictures $
+	[
+		{-
+		fitToArea (-1/2, -1/2) (vecX wSize, -vecY wSize) $
+		uncurry fitToArea textArea $
+		Color white $
+			Line $ rect (0,0) (1,1),
+		-}
+		--Translate 0 lineHeight $
+		Pictures $
+		adjustTextLines $
+		map (
+			Scale 0.08 0.08 .
+			Color white .
+			Text
+		) $
+			textLines
+	]
+	where
+		adjustTextLines :: [Picture] -> [Picture]
+		adjustTextLines =
+			map adjust . ([0..] `zip`)
+			where
+				adjust :: (Int, Picture) -> Picture
+				adjust (index, text) =
+					Translate (fst textPos0) yPos text
+					where
+						yPos =
+							snd textPos0 +
+							lineHeight * (fromIntegral index)
+		lineHeight =
+			(/(fromIntegral $ length textLines)) $ (snd $ textPos1 |-| textPos0)
+		textLines = lines $ info dbgInfo
+		textPos0 :: Vec Float
+		textPos0 =
+			( (\x -> -x) $ (/2) $ fst wSize
+			, (/2) $ snd wSize
+			)
+		textPos1 :: Vec Float
+		textPos1 =
+			textPos0 |-| ((snd textArea) |*| wSize)
+
+renderGame world =
+	--Color red $ Polygon $ rect (0,0) (1,1)
 	case (world_uiState world) of
 		Menu ->
-			renderMenu wSize menuArea world
-			where menuArea = ((0,0),wSize)
+			renderMenu
 		Playing ->
-			renderGame wSize textArea gameArea world
-			where
-				gameArea = ((0, textHeight), wSize |-| (0,textHeight))
-				textArea = ((0,0), (vecX wSize, textHeight))
-				textHeight = 50
-				{-
-				gameArea = ((textAreaWidth,0), wSize |-| (textAreaWidth,0))
-				textArea =
-					((0,0), (textAreaWidth,vecY wSize))
-				textAreaWidth = 50
-				-}
+			renderGameArea world
 
-renderMenu :: WindowSize -> DestAreaOnScreen -> World -> Picture
-renderMenu wSize destArea _ = Color yellow $ Polygon $
-	map (normalizedPosToGloss wSize destArea) $ rect (0,0) (1,1)
+renderMenu = Pictures []
 
-renderGame :: WindowSize -> DestAreaOnScreen -> DestAreaOnScreen -> World -> Picture
-renderGame wSize dbgTextArea gameArea world =
-	Pictures $ [
-		renderGameArea wSize gameArea world ,
-		renderDbgText wSize dbgTextArea world
-	]
-
-renderGameArea :: WindowSize -> DestAreaOnScreen -> World -> Picture
-renderGameArea wSize destArea world =
+renderGameArea :: World -> Picture
+renderGameArea world =
 	Pictures [
-		Color white $ Line (fmap (normalizedPosToGloss wSize destArea) $ rect (0,0) (1,1)),
-		renderLabyrinth wSize destArea cellSize (world_labyrinth world),
-		renderPacMan wSize destArea cellSize (world_pacman world)
-		--renderGhosts wSize destArea cellSize (world_ghosts world)
+		renderLabyrinth cellSize lab,
+		renderPacMan cellSize (world_pacman world),
+		renderGhosts cellSize (world_ghosts world)
 	]
 	where
 		cellSize :: Size Float
 		cellSize = (1,1) |/| (fromIntegral $ mGetWidth lab, fromIntegral $ mGetHeight lab)
 		lab = world_labyrinth world 
 
-
-renderPacMan :: WindowSize -> DestAreaOnScreen -> Size Float -> Pacman -> Picture
-renderPacMan wSize gameArea cellSize pacman =
-	renderChar wSize gameArea cellSize pacman $
-	Translate (1/2) (-1/2) $
+renderPacMan :: Size Float -> Pacman -> Picture
+renderPacMan cellSize pacman =
+	renderChar cellSize pacman $
+	Translate (1/2) (1/2) $
 	Rotate rotateAngle $
 	Color yellow $
 	ThickArc
@@ -93,90 +121,54 @@ renderPacMan wSize gameArea cellSize pacman =
 		rotateAngle =
 			case vecMap signum $ obj_direction pacman of
 				(1,0) -> 0
-				(1,1) -> 45
-				(0,1) -> 90
-				(-1,1) -> 135
-				(-1,0) -> 180
-				(-1,-1) -> 225
-				(0,-1) -> 270
-				(1,-1) -> 315
+				(1,1) -> -45
+				(0,1) -> -90
+				(-1,1) -> -135
+				(-1,0) -> -180
+				(-1,-1) -> -225
+				(0,-1) -> -270
+				(1,-1) -> -315
 				_ -> 0
 				--angle -> error $ "got " ++ show angle
 
-renderGhosts :: WindowSize -> DestAreaOnScreen -> Size Float -> [Ghost] -> Picture
-renderGhosts wSize gameArea cellSize =
-	Pictures . map (renderGhost wSize gameArea cellSize)
+renderGhosts :: Size Float -> [Ghost] -> Picture
+renderGhosts cellSize =
+	Pictures . map (renderGhost cellSize)
 
-
-renderGhost :: WindowSize -> DestAreaOnScreen -> Size Float -> Ghost -> Picture
-renderGhost wSize gameArea cellSize ghost = renderChar wSize gameArea cellSize ghost$
-	Translate (0) (-1) $
-	--Translate (1/2) (-1/2) $
+renderGhost :: Size Float -> Ghost -> Picture
+renderGhost cellSize ghost =
+	renderChar cellSize ghost $
 	Color green $
 	(Polygon $ rect (0,0) (1,1))
 	where
-		--mouthAngle = 90 * (sin $ 5 * obj_t ghost)
 
+renderChar :: Size Float -> Object st -> Picture -> Picture
+renderChar cellSize object =
+	uncurry Translate (cellSize |*| obj_pos object) .
+	uncurry Scale (cellSize |*| obj_size object)
 
-renderChar :: WindowSize -> DestAreaOnScreen -> Size Float -> Object st -> Picture -> Picture
-renderChar wSize gameArea cellSize obj pic =
-	(uncurry Translate) (normalizedPosToGloss wSize gameArea (cellSize |*| (obj_pos obj))) $
-	(uncurry Scale) (obj_size obj) $
-	(uncurry Scale) (normalizedPosToScreen gameArea cellSize |-| normalizedPosToScreen gameArea (0,0)) $
-	pic
-
-renderLabyrinth :: WindowSize -> DestAreaOnScreen -> Size Float -> Labyrinth -> Picture
-renderLabyrinth wSize destArea cellSize lab = Pictures $ F.foldr (:)[] $ mapWithIndex drawCell lab
+renderLabyrinth :: Size Float -> Labyrinth -> Picture
+renderLabyrinth cellSize lab =
+	--Color white $ Polygon $ rect (0,0) (1,1)
+	Pictures $
+		F.foldr (:) [] $ mapWithIndex drawCell lab
 	where
         -- in order to display the matrix correctly the lines/columns have to be flipped when drawing
 		drawCell :: MatrIndex -> Territory -> Picture
 		drawCell coords = drawCell' (swap coords)
-		drawCell' coords0 ter = case ter of
-			Free -> Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
-			Wall -> Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
-	    		where
+		drawCell' coords0 ter =
+			case ter of
+				Free -> Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
+				Wall -> Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
+			where
 				posCell = posFromCoords coords0
 				sizeCell= posFromCoords (coords0 |+| (1,1)) |-| posCell
-				posFromCoords coords = normalizedPosToGloss wSize destArea $ vecMap fromIntegral coords |*| cellSize
+				posFromCoords coords = vecMap fromIntegral coords |*| cellSize
 
-rect :: NormalCoords -> NormalSize -> [NormalCoords]
+fitToArea :: Vec Float -> Vec Float -> Picture -> Picture
+fitToArea (posX, posY) (width, height) =
+	Scale width height .
+	Translate posX posY
+
+rect :: Pos Float -> Size Float-> [Pos Float]
 rect pos (w,h) = [ pos, pos|+|(0,h), pos|+|(w,h), pos|+|(w,0), pos ]
-
-renderDbgText :: WindowSize -> DestAreaOnScreen -> World -> Picture
-renderDbgText wSize destArea world =
-	Pictures [
-		renderLines 0 $ lines $ info $ world_dbgInfo world,
-		Color white $ Line (fmap (normalizedPosToGloss wSize destArea) $ rect (0,0) (1,1))
-	]
-	where
-		renderLines :: Float -> [String] -> Picture
-		renderLines yPos lines' = case lines' of
-			[] -> Blank
-			(x:xs) -> Pictures $ [
-				(uncurry Translate) (normalizedPosToGloss wSize destArea (0,0.1+yPos)) $
-				Color white $ 
-				Scale 0.1 0.1 $
-				Text x,
-				renderLines (yPos+lineHeight) xs ]
-			where lineHeight = min 
-				((1-yPos) / (fromIntegral $ length lines'))
-				0.1
-
--- coordinate translaters:
-
-normalizedPosToGloss :: WindowSize -> DestAreaOnScreen -> NormalCoords -> GlossCoords
-normalizedPosToGloss wSize destArea pos = toGloss wSize $ normalizedPosToScreen destArea pos
-
-normalizedPosToScreen :: DestAreaOnScreen -> NormalCoords -> PosOnScreen
-normalizedPosToScreen (posOnScr,sizeOnScr) pos = posOnScr |+| pos |*| sizeOnScr
-
-{- game programmers are used to (0,0) to be in the left upper corner of the screen,
--- and (ScreenWidth,ScreenHeight) to be the right bottom corner.
--- GLOSS uses ccoords whose origin is the center of the screen,
--- x-Axis and y-Axis pointint right/up (like in math)
--}
-toGloss :: WindowSize -> PosOnScreen -> GlossCoords
-toGloss wSize pos = (pos |-| (wSize |/ 2)) |*| (1,-1)
-
-fromGloss :: WindowSize -> GlossCoords -> PosOnScreen
-fromGloss wSize pos = pos |*| (1,-1) |+| (wSize |/ 2)

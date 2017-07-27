@@ -14,6 +14,7 @@ import Control.Monad.Identity
 import SGData.Matrix
 import Control.Monad.Random
 import Data.Maybe( fromJust )
+import Data.List
 import Control.Monad.State
 import Control.Monad.Trans.Maybe
 
@@ -28,12 +29,26 @@ genWorld' ::
 genWorld' worldSize wallRatio =
 	do
 		labyrinth <- genLabyrinth worldSize wallRatio
+		startPositions <-
+			randomSubSet 5 $
+			map swap $ 
+			filter ((==Free) . flip mGet labyrinth) $
+			mGetAllIndex labyrinth
+		let (pacmanPos:monsterPositions) = startPositions
+		{-
 		pacmanPos <-
 			-- choose random free field:
 			fmap (vecMap fromIntegral) $
 			uniform $ map swap $ 
 			filter ((==Free) . flip mGet labyrinth) $
 			mGetAllIndex labyrinth
+		monsterPositions <-
+			randomSubSet $
+			(\\pacmanPos) $
+			map swap $ 
+			filter ((==Free) . flip mGet labyrinth) $
+			mGetAllIndex labyrinth
+		-}
 		return $
 			World {
 				world_uiState = Menu,
@@ -41,12 +56,11 @@ genWorld' worldSize wallRatio =
 				world_points = 0,
 				world_labyrinth = labyrinth,
 				world_pacman =
-					(defObj pacmanPos){
-						obj_size = pacManSize,
-						obj_direction = (0,0),
-						obj_t = 0
+					(defObj (vecMap fromIntegral pacmanPos)){
+						obj_size = pacManSize
 					},
-				world_ghosts = ghosts,
+				world_ghosts =
+					map (defObj . vecMap fromIntegral) monsterPositions,
 				world_dots = [],
 				world_fruits= [],
 				world_dbgInfo = DbgInf{ info = "" },
@@ -55,9 +69,18 @@ genWorld' worldSize wallRatio =
 	where
 		pacManSize =
 			(0.7,0.7)
-		ghosts = []
-			--[ Object{ obj_pos=(0,0), obj_size=pacManSize, obj_direction=(0,0), obj_t=0, obj_state=GhostState { rndState= mkStdGen seed } }]
+		{-
+		ghosts =
+			[Object{ obj_pos=(0,0), obj_size=pacManSize, obj_direction=(0,0), obj_t=0, obj_state=GhostState { rndState= mkStdGen seed } }]
+		-}
 
+randomSubSet :: (MonadRandom m, Eq a) => Int -> [a] -> m [a]
+randomSubSet count list
+	| count == 0 = return []
+	| otherwise =
+		do
+			x <- uniform list
+			fmap (x :) $ randomSubSet (count-1) (list\\[x])
 
 -- create a labyrinth by spawning worms on a field that is massive in the beginning:
 genLabyrinth ::

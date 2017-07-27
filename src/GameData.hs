@@ -88,14 +88,16 @@ data Object objState = Object {
 	obj_state :: objState
 } deriving(Show)
 
+{-
 data GhostState = GhostState {
 	rndState :: StdGen
 } deriving(Show)
+-}
 
 type Dot = Object ()
 type Fruit = Object ()
 type Pacman = Object ()
-type Ghost = Object GhostState
+type Ghost = Object ()
 
 defObj pos = Object{
 	obj_pos = pos,
