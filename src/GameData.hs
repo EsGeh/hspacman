@@ -1,6 +1,6 @@
 module GameData where
 
-import SGData.Vector2D
+import Vector2D
 import SGData.Matrix
 
 import Prelude hiding(Left,Right)
@@ -11,9 +11,6 @@ import Data.Fixed
 data Direction = Up | Down | Right | Left deriving (Eq, Show)
 type Movement = Direction
 
-type Pos a = Vec a
-type Speed a = Vec a
-type Size a = Vec a
 --type Area a = (Pos a, Size a)
 
 type Time = Float
@@ -135,26 +132,9 @@ speedToDirection speed =
 
 pointInSize :: Integral a => Size a -> Pos a -> Size a
 pointInSize (width,height) (x,y)  = (x `mod` width, y `mod` height)
+
 pointInSizeF :: (Real a) => Size a -> Pos a -> Size a
 pointInSizeF (width,height) (x,y)  = (x `mod'` width, y `mod'` height)
 
 movePoint :: Integral a => Size a -> Pos a -> Speed a -> Pos a
 movePoint size_ pos_ dir = pointInSize size_ (pos_ |+| dir)
-
--- realizes a "torus like" behavior for positions on the field
-{-getNeighbourIndex :: Size -> MatrIndex -> Movement -> MatrIndex
-getNeighbourIndex (width,height) pos@(x,y) dir = case dir of
-	Up -> (x,(y-1) `niceMod` height)
-	Right -> ((x+1) `niceMod` width, y)
-	Down -> (x,(y+1) `niceMod` height)
-	Left -> ((x-1) `niceMod` width, y)
-	where
-		niceMod val m = case signum val of
-			(-1) -> niceMod (val+m) m
-			(1) -> val `mod` m
-			(0) -> 0
-			otherwise -> error "niceMod internal error!"
--}
-
-{-data ObjectType = Dot | Fruit
-data MovableObjType = PacMan | Monster-}

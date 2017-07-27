@@ -4,7 +4,7 @@ module LevelGenerator(
 ) where
 
 import GameData --hiding(Direction)
-import SGData.Vector2D
+import Vector2D
 import RandomUtils
 import Prelude hiding(Left,Right)
 import Data.Tuple

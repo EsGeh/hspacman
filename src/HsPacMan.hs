@@ -4,8 +4,7 @@ import GameData
 import LevelGenerator
 import Renderpipeline
 import SGData.Vector2D hiding ( (*|), (|*) )
-import Vector2D ( (*|), (|*) )
---import Vector2D
+import Vector2D
 import SGData.Matrix
 
 import Prelude hiding(Left,Right)
@@ -132,23 +131,21 @@ movePacman dt world@World{ world_pacman=pacMan } =
 			, "pos: ", show (obj_pos pacMan), "\n"
 			, "setDirection: ", show (setDirection pacMan), "\n"
 			]
-			{-"pos pacMan: " ++ (show $ vecMap floor $ pos pacMan) ++ "\n" ++
-			"pos pacMan exact: " ++ (show $ pos pacMan) ++ "\n" {-++
-			"possibleDirs: " ++ show possibleDirs-} -}
 		speed = 2
 
 moveCharacter :: DeltaT -> World -> Object st -> Object st
 moveCharacter dt world obj =
 	obj{
-		obj_pos=newPos,
-		obj_t= (obj_t obj + dt)
+		obj_pos = newPos,
+		obj_t = (obj_t obj + dt)
 	}
 	where
-		newPos = if (willCollide (world_labyrinth world) dt obj)
+		newPos =
+			if (willCollide (world_labyrinth world) dt obj)
 			then obj_pos obj
 			else (pointInSizeF labSize $ obj_pos obj |+| (obj_direction obj) |* dt) -- pointInSize: torus
 				where
-					labSize = vecMap fromIntegral (mGetWidth lab -1,mGetHeight lab -1)
+					labSize = vecMap fromIntegral (mGetWidth lab, mGetHeight lab)
 					lab = world_labyrinth world
 
 possibleDirections :: Labyrinth -> DeltaT -> Object st -> [Direction]
@@ -158,20 +155,23 @@ possibleDirections lab deltaT obj =
 
 willCollide :: Labyrinth -> DeltaT -> Object st -> Bool
 willCollide lab deltaT obj =
-	or $
-	map (willPointCollide lab deltaT (obj_direction obj)) $
-	[ p , p |+| (0,h), p |+| (w,h), p |+| (w,0) ]
+	any (willPointCollide lab deltaT $ obj_direction obj) $
+	rect (obj_pos obj) (obj_size obj)
 	where
 		p = obj_pos obj
 		(w,h) = obj_size obj
 
 willPointCollide :: Labyrinth -> Float -> Speed Float -> Pos Float -> Bool
 willPointCollide lab deltaT dir oldPos =
-	(==Wall) $ mGet (calcMatrIndex nextPos) lab 
+	(==Wall) $
+	mGet `flip` lab $
+	calcMatrIndex $
+	nextPos
 	where
 		calcMatrIndex :: Pos Float -> MatrIndex
-		calcMatrIndex pos = swap $
+		calcMatrIndex pos =
+			swap $
 			vecMap floor $
-			pointInSizeF (fromIntegral $ mGetWidth lab -1, fromIntegral $ mGetHeight lab -1) pos -- torus
+			pointInSizeF (fromIntegral $ mGetWidth lab, fromIntegral $ mGetHeight lab) pos -- torus
 		nextPos :: Pos Float
 		nextPos = (oldPos |+| dir |* deltaT)

@@ -1,9 +1,7 @@
 module Renderpipeline where
 
 import GameData
---import LevelGenerator
-import SGData.Vector2D
---import Math.Matrix
+import Vector2D
 import SGData.Matrix
 import qualified Data.Foldable as F -- enables folds over matrices
 import Data.Tuple
@@ -137,7 +135,6 @@ renderGhost cellSize ghost =
 	renderChar cellSize ghost $
 	Color green $
 	(Polygon $ rect (0,0) (1,1))
-	where
 
 renderChar :: Size Float -> Object st -> Picture -> Picture
 renderChar cellSize object =
@@ -166,6 +163,3 @@ fitToArea :: Vec Float -> Vec Float -> Picture -> Picture
 fitToArea (posX, posY) (width, height) =
 	Scale width height .
 	Translate posX posY
-
-rect :: Pos Float -> Size Float-> [Pos Float]
-rect pos (w,h) = [ pos, pos|+|(0,h), pos|+|(w,h), pos|+|(w,0), pos ]
