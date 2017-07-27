@@ -6,8 +6,6 @@ import SGData.Matrix
 import Prelude hiding(Left,Right)
 import Data.Fixed
 
-import System.Random
-
 
 -- |Directions in Labyrinth
 data Direction = Up | Down | Right | Left deriving (Eq, Show)
@@ -99,6 +97,7 @@ type Fruit = Object ()
 type Pacman = Object ()
 type Ghost = Object ()
 
+defObj :: Pos Float -> Object ()
 defObj pos = Object{
 	obj_pos = pos,
 	obj_size = (1,1),

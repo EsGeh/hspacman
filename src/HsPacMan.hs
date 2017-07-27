@@ -7,16 +7,12 @@ import SGData.Vector2D hiding ( (*|), (|*) )
 import Vector2D ( (*|), (|*) )
 --import Vector2D
 import SGData.Matrix
-import RandomUtils
 
 import Prelude hiding(Left,Right)
 
 import Graphics.Gloss hiding(display)
 import Graphics.Gloss.Interface.Pure.Game hiding(Up,Down)
 import qualified Graphics.Gloss.Interface.Pure.Game as G
-
--- import System.Random
-import Control.Monad.Random
 
 import Data.Tuple
 import Data.List
@@ -129,7 +125,7 @@ movePacman dt world@World{ world_pacman=pacMan } =
 		setDirection obj =
 			obj{
 				obj_direction =
-					speed *| (vecMap fromIntegral $ directionsToSpeed $ world_userInput world)
+					speed *| (vecMap fromInteger $ directionsToSpeed $ world_userInput world)
 			}
 		dbgText = concat $
 			[ "userInput: ", show $ world_userInput world, "\n"

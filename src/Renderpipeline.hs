@@ -10,30 +10,22 @@ import Data.Tuple
 
 import Graphics.Gloss hiding(display)
 
-type SizeOnScreen = Vec Float
---type AreaOnScreen = (PosOnScreen,SizeOnScreen)
 
--- nice aliases:
-type WindowSize = SizeOnScreen
---type DestAreaOnScreen = AreaOnScreen
-
-
--- origin is the center of the screen!, (x-Axis right, y-Axis up)
-type GlossCoords = Vec Float
-
+type WindowSize = Vec Float
 
 renderWorld :: WindowSize -> World -> Picture
 renderWorld wSize world =
 	Pictures $
 	[
 		fitToArea (-1/2, -1/2) (vecX wSize, -vecY wSize) $
-		fitToArea (0,textHeight) (1, 1-textHeight) $
+		--fitToArea (0,textHeight) (1, 1-textHeight) $
+		uncurry fitToArea gameArea $
 		renderGame world,
 		renderDbgText wSize textArea (world_dbgInfo world)
 	]
 	where
 		gameArea :: (Vec Float, Vec Float)
-		gameArea = ((0, textHeight), wSize |-| (0,textHeight))
+		gameArea = ((0, textHeight), 1 |-| (0,textHeight))
 		textArea :: (Vec Float, Vec Float)
 		textArea = ((0,0), (1, textHeight))
 		textHeight :: Float
@@ -65,8 +57,8 @@ renderDbgText wSize textArea dbgInfo =
 			map adjust . ([0..] `zip`)
 			where
 				adjust :: (Int, Picture) -> Picture
-				adjust (index, text) =
-					Translate (fst textPos0) yPos text
+				adjust (index, textLine) =
+					Translate (fst textPos0) yPos textLine
 					where
 						yPos =
 							snd textPos0 +
@@ -83,6 +75,7 @@ renderDbgText wSize textArea dbgInfo =
 		textPos1 =
 			textPos0 |-| ((snd textArea) |*| wSize)
 
+renderGame :: World -> Picture
 renderGame world =
 	--Color red $ Polygon $ rect (0,0) (1,1)
 	case (world_uiState world) of
@@ -91,7 +84,11 @@ renderGame world =
 		Playing ->
 			renderGameArea world
 
-renderMenu = Pictures []
+renderMenu :: Picture
+renderMenu =
+	Pictures [
+		Color red $ Polygon $ rect (0,0) (1,1)
+	]
 
 renderGameArea :: World -> Picture
 renderGameArea world =

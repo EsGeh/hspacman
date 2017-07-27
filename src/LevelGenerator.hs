@@ -8,8 +8,6 @@ import SGData.Vector2D
 import RandomUtils
 import Prelude hiding(Left,Right)
 import Data.Tuple
-import qualified Data.Foldable as F
-import Control.Monad.Identity
 
 import SGData.Matrix
 import Control.Monad.Random
@@ -18,6 +16,7 @@ import Data.List
 import Control.Monad.State
 import Control.Monad.Trans.Maybe
 
+genWorld :: Int -> World
 genWorld seed =
 	flip evalRand (mkStdGen seed) $
 	genWorld' (20,20) 0.4
