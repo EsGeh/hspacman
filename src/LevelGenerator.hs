@@ -18,60 +18,39 @@ import Control.Monad.Trans.Maybe
 
 genWorld :: Int -> World
 genWorld seed =
-	flip evalRand (mkStdGen seed) $
-	genWorld' (20,20) 0.4
+	--flip evalRand (mkStdGen seed) $
+	genWorld' (mkStdGen seed) (20,20) 0.4
 
 genWorld' ::
-	MonadRandom m =>
+	StdGen ->
 	Size Int -> Float
-	-> m World
-genWorld' worldSize wallRatio =
-	do
-		labyrinth <- genLabyrinth worldSize wallRatio
-		startPositions <-
-			randomSubSet 5 $
-			map swap $ 
-			filter ((==Free) . flip mGet labyrinth) $
-			mGetAllIndex labyrinth
-		let (pacmanPos:monsterPositions) = startPositions
-		{-
-		pacmanPos <-
-			-- choose random free field:
-			fmap (vecMap fromIntegral) $
-			uniform $ map swap $ 
-			filter ((==Free) . flip mGet labyrinth) $
-			mGetAllIndex labyrinth
-		monsterPositions <-
-			randomSubSet $
-			(\\pacmanPos) $
-			map swap $ 
-			filter ((==Free) . flip mGet labyrinth) $
-			mGetAllIndex labyrinth
-		-}
-		return $
+	-> World
+genWorld' rndGen worldSize wallRatio =
+	let ((labyrinth, (pacmanPos:monsterPositions)), newRndGen) = runRand `flip` rndGen $
+		do
+			labyrinth <- genLabyrinth worldSize wallRatio
+			startPositions <-
+				randomSubSet 5 $
+				map swap $ 
+				filter ((==Free) . flip mGet labyrinth) $
+				mGetAllIndex labyrinth
+			return (labyrinth, startPositions)
+	in
 			World {
 				world_uiState = Menu,
 				world_level = 1,
 				world_points = 0,
 				world_labyrinth = labyrinth,
 				world_pacman =
-					(defObj (vecMap fromIntegral pacmanPos)){
-						obj_size = pacManSize
-					},
+					(defObj (vecMap fromIntegral pacmanPos)),
 				world_ghosts =
-					map (defObj . vecMap fromIntegral) monsterPositions,
+					map (defGhost . vecMap fromIntegral) monsterPositions,
 				world_dots = [],
 				world_fruits= [],
 				world_dbgInfo = DbgInf{ info = "" },
-				world_userInput = []
+				world_userInput = [],
+				world_randomGen = newRndGen
 			}
-	where
-		pacManSize =
-			(0.7,0.7)
-		{-
-		ghosts =
-			[Object{ obj_pos=(0,0), obj_size=pacManSize, obj_direction=(0,0), obj_t=0, obj_state=GhostState { rndState= mkStdGen seed } }]
-		-}
 
 randomSubSet :: (MonadRandom m, Eq a) => Int -> [a] -> m [a]
 randomSubSet count list

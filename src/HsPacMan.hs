@@ -1,3 +1,6 @@
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE NamedFieldPuns #-}
 module Main where
 
 import GameData
@@ -15,6 +18,7 @@ import qualified Graphics.Gloss.Interface.Pure.Game as G
 
 import Data.Tuple
 import Data.List
+import Control.Monad.Random
 
 
 windowTitle :: String
@@ -82,36 +86,39 @@ setPacDir world dir = world { world_pacman = (world_pacman world) {obj_direction
 
 moveWorld :: DeltaT -> World -> World
 moveWorld deltaT =
-	(movePacman deltaT)
-	-- (moveGhosts deltaT)
+	(movePacman deltaT) .
+	(moveGhosts deltaT)
 
-{-
 moveGhosts :: DeltaT -> World -> World
-moveGhosts dt world0 =
-	world0{
-		world_ghosts =
-			map (moveCharacter dt world0 . setDirection world0) $ world_ghosts world0,
-		world_dbgInfo=
-			DbgInf{
-				info= "" -- show $ possibleDirections (world_labyrinth world0) dt (head $ world_ghosts world0 )
-			}
-	}
-	where
-		--monsterSpeed = (fromIntegral $ level world)
-		-- this function is the ai for the ghosts
-		setDirection :: World -> Ghost -> Ghost
-		setDirection world ghost = ghost{
-			obj_direction= obj_direction $ world_pacman world,
-			--obj_direction= vecMap fromIntegral $ directionsToSpeed [newDir],
-			obj_state = obj_state ghost
-			--obj_state = GhostState{ rndState=newRndState }
+moveGhosts dt world =
+	let (newWorld, newRnd) =
+		runRand `flip` (world_randomGen world) $
+		world_mapToGhostsM (mapM $ moveGhost world dt) world
+	in
+		newWorld{ world_randomGen = newRnd }
+
+moveGhost :: MonadRandom m => World -> DeltaT -> Ghost -> m Ghost
+moveGhost world dt =
+	fmap (moveCharacter dt world) .
+	ghostBehaviour world
+
+ghostBehaviour :: MonadRandom m => World -> Ghost -> m Ghost
+ghostBehaviour _ ghost@Object{ obj_state = GhostState { ghost_dir_history }, .. } =
+	let
+		[(lastDir, lastDecision)] = ghost_dir_history
+	in
+	do
+		(newDir, newLastDecision) <-
+			if obj_t - lastDecision > 5
+			then fmap (,obj_t) $ uniform $ allDirs
+			else return (lastDir, lastDecision)
+		return $ ghost{
+			obj_direction = speed *| directionToSpeed newDir,
+			obj_state = GhostState{ ghost_dir_history= [(newDir, newLastDecision)] }
 		}
-			where
-				(newDir,newRndState) = runRand rndDir (rndState $ obj_state ghost)
-				rndDir = randomDirS possibleDirs [(head $ speedToDirection $ obj_direction ghost,0.98)]
-				possibleDirs = possibleDirections (world_labyrinth world) dt ghost
-				pacManObj= world_pacman world
--}
+	where
+		speed :: Float
+		speed = 2
 
 movePacman :: DeltaT -> World -> World
 movePacman dt world@World{ world_pacman=pacMan } =
@@ -158,8 +165,8 @@ willCollide lab deltaT obj =
 	any (willPointCollide lab deltaT $ obj_direction obj) $
 	rect (obj_pos obj) (obj_size obj)
 	where
-		p = obj_pos obj
-		(w,h) = obj_size obj
+		--p = obj_pos obj
+		--(w,h) = obj_size obj
 
 willPointCollide :: Labyrinth -> Float -> Speed Float -> Pos Float -> Bool
 willPointCollide lab deltaT dir oldPos =

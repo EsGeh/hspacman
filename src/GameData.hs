@@ -5,6 +5,8 @@ import SGData.Matrix
 
 import Prelude hiding(Left,Right)
 import Data.Fixed
+import Control.Monad.Identity
+import System.Random( StdGen )
 
 
 -- |Directions in Labyrinth
@@ -51,9 +53,18 @@ data World = World {
 	world_ghosts :: [Ghost],
 	world_dots :: [Dot],
 	world_fruits :: [Fruit],
-	world_dbgInfo :: DebugInfo
+	world_dbgInfo :: DebugInfo,
+	world_randomGen :: StdGen
 }
 	-- deriving(Show)
+world_mapToGhostsM :: Monad m => ([Ghost] -> m [Ghost]) -> World -> m World
+world_mapToGhostsM f x =
+	do
+		x' <- f (world_ghosts x)
+		return $ x{ world_ghosts = x'}
+
+world_mapToGhosts :: ([Ghost] -> [Ghost]) -> World -> World
+world_mapToGhosts f = runIdentity . world_mapToGhostsM (return . f)
 
 type CurrentKeys = [Direction]
 
@@ -83,25 +94,26 @@ data Object objState = Object {
 	obj_state :: objState
 } deriving(Show)
 
-{-
 data GhostState = GhostState {
-	rndState :: StdGen
+	ghost_dir_history :: [(Direction, Float)]
 } deriving(Show)
--}
 
 type Dot = Object ()
 type Fruit = Object ()
 type Pacman = Object ()
-type Ghost = Object ()
+type Ghost = Object GhostState
 
 defObj :: Pos Float -> Object ()
 defObj pos = Object{
-	obj_pos = pos,
-	obj_size = (1,1),
+	obj_pos = pos |+| (0.1, 0.1) ,
+	obj_size = (0.8,0.8),
 	obj_direction = (0,0),
 	obj_t = 0,
 	obj_state = ()
 }
+defGhost :: Pos Float -> Ghost
+defGhost pos =
+	(defObj pos){ obj_state = GhostState{ ghost_dir_history = [ (Right, 0)] } }
 
 data UIState = Playing | Menu deriving(Show)
 
