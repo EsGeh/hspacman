@@ -134,7 +134,8 @@ renderGhost :: Size Float -> Ghost -> Picture
 renderGhost cellSize ghost =
 	renderChar cellSize ghost $
 	Color green $
-	(Polygon $ rect (0,0) (1,1))
+	Polygon $ [(1/2,0), (1,1), (0,1) ]
+	-- (Polygon $ rect (0,0) (1,1))
 
 renderChar :: Size Float -> Object st -> Picture -> Picture
 renderChar cellSize object =

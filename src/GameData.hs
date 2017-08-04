@@ -145,8 +145,21 @@ speedToDirection speed =
 pointInSize :: Integral a => Size a -> Pos a -> Size a
 pointInSize (width,height) (x,y)  = (x `mod` width, y `mod` height)
 
-pointInSizeF :: (Real a) => Size a -> Pos a -> Size a
-pointInSizeF (width,height) (x,y)  = (x `mod'` width, y `mod'` height)
+pointInSizeF :: Size Float -> Pos Float -> Size Float
+--pointInSizeF :: (Real a) => Size a -> Pos a -> Size a
+pointInSizeF (width,height) (x,y)  =
+	( (x) `safeRealMod` width
+	, (y) `safeRealMod` height
+	)
+
+safeRealMod :: Float -> Float -> Float
+--safeRealMod :: Real a => a -> a -> a
+safeRealMod x m =
+	let res = x `mod'` m
+	in
+		if res >= m + 0.0001
+		then 0
+		else res
 
 movePoint :: Integral a => Size a -> Pos a -> Speed a -> Pos a
 movePoint size_ pos_ dir = pointInSize size_ (pos_ |+| dir)
