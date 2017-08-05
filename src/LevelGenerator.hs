@@ -30,7 +30,7 @@ genWorld' rndGen worldSize wallRatio =
 		do
 			labyrinth <- genLabyrinth worldSize wallRatio
 			startPositions <-
-				randomSubSet 5 $
+				randomSubSet 4 $
 				map swap $ 
 				filter ((==Free) . flip mGet labyrinth) $
 				mGetAllIndex labyrinth

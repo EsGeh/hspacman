@@ -1,12 +1,14 @@
+{-# LANGUAGE TemplateHaskell #-}
 module GameData where
 
 import Vector2D
 import SGData.Matrix
 
 import Prelude hiding(Left,Right)
-import Data.Fixed
-import Control.Monad.Identity
+--import Control.Monad.Identity
 import System.Random( StdGen )
+import Lens
+import Lens.Micro.Platform
 
 
 -- |Directions in Labyrinth
@@ -57,14 +59,6 @@ data World = World {
 	world_randomGen :: StdGen
 }
 	-- deriving(Show)
-world_mapToGhostsM :: Monad m => ([Ghost] -> m [Ghost]) -> World -> m World
-world_mapToGhostsM f x =
-	do
-		x' <- f (world_ghosts x)
-		return $ x{ world_ghosts = x'}
-
-world_mapToGhosts :: ([Ghost] -> [Ghost]) -> World -> World
-world_mapToGhosts f = runIdentity . world_mapToGhostsM (return . f)
 
 type CurrentKeys = [Direction]
 
@@ -103,6 +97,7 @@ type Fruit = Object ()
 type Pacman = Object ()
 type Ghost = Object GhostState
 
+-- default objects
 defObj :: Pos Float -> Object ()
 defObj pos = Object{
 	obj_pos = pos |+| (0.1, 0.1) ,
@@ -116,6 +111,10 @@ defGhost pos =
 	(defObj pos){ obj_state = GhostState{ ghost_dir_history = [ (Right, 0)] } }
 
 data UIState = Playing | Menu deriving(Show)
+
+makeLensesWith lensRules' ''World
+makeLensesWith lensRules' ''Object
+makeLensesWith lensRules' ''GhostState
 
 directionsToSpeed :: Num a => [Direction] -> Vec a
 directionsToSpeed = foldl (|+|) (0,0) . map directionToSpeed
@@ -141,25 +140,3 @@ speedToDirection speed =
 			_ -> error "internal error"
 	in
 		xDir ++ yDir
-
-pointInSize :: Integral a => Size a -> Pos a -> Size a
-pointInSize (width,height) (x,y)  = (x `mod` width, y `mod` height)
-
-pointInSizeF :: Size Float -> Pos Float -> Size Float
---pointInSizeF :: (Real a) => Size a -> Pos a -> Size a
-pointInSizeF (width,height) (x,y)  =
-	( (x) `safeRealMod` width
-	, (y) `safeRealMod` height
-	)
-
-safeRealMod :: Float -> Float -> Float
---safeRealMod :: Real a => a -> a -> a
-safeRealMod x m =
-	let res = x `mod'` m
-	in
-		if res >= m + 0.0001
-		then 0
-		else res
-
-movePoint :: Integral a => Size a -> Pos a -> Speed a -> Pos a
-movePoint size_ pos_ dir = pointInSize size_ (pos_ |+| dir)

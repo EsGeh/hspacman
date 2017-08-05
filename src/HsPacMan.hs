@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main where
@@ -20,6 +18,8 @@ import qualified Graphics.Gloss.Interface.Pure.Game as G
 import Data.Tuple
 import Data.List
 import Control.Monad.Random
+
+import Lens.Micro.Platform
 
 
 windowTitle :: String
@@ -87,111 +87,100 @@ setPacDir world dir = world { world_pacman = (world_pacman world) {obj_direction
 
 moveWorld :: DeltaT -> World -> World
 moveWorld deltaT =
-	(movePacman deltaT) .
-	(moveGhosts deltaT)
+	movePacman deltaT
+	.
+	moveGhosts deltaT
 
 moveGhosts :: DeltaT -> World -> World
 moveGhosts dt world =
 	let (newWorld, newRnd) =
 		runRand `flip` (world_randomGen world) $
-		world_mapToGhostsM (mapM $ moveGhost world dt) world
+		traverseOf world_ghosts_l (mapM $ moveGhost world dt) world
 	in
 		newWorld{ world_randomGen = newRnd }
 
-moveGhost :: MonadRandom m => World -> DeltaT -> Ghost -> m Ghost
-moveGhost world dt =
-	fmap (moveCharacter dt world) .
-	ghostBehaviour world dt
-
-ghostBehaviour :: forall m . MonadRandom m => World -> DeltaT -> Ghost -> m Ghost
-ghostBehaviour world dt ghost@Object{ obj_state = GhostState { ghost_dir_history }, .. } =
-	let
-		[(lastDir, lastDecision)] = ghost_dir_history
-		possibleDirs = possibleDirections (world_labyrinth world) dt ghost :: [Direction]
-	in
+moveGhost :: forall m . MonadRandom m => World -> DeltaT -> Ghost -> m Ghost
+moveGhost world dt ghost =
 	do
-		(newDir, newLastDecision) <-
-			if (obj_t - lastDecision < 5) && (lastDir `elem` possibleDirs)
-				then return (lastDir, lastDecision)
-				else 
-					fmap (,obj_t) $
-					uniform $ possibleDirs
-			:: m (Direction, Float)
-		{-
-		(newDir, newLastDecision) <-
-			if obj_t - lastDecision > 5
-			then
-				fmap (,obj_t) $
-				--uniform $ allDirs
-				uniform $
-				possibleDirections (world_labyrinth world) dt ghost
-			else return (lastDir, lastDecision)
-		-}
-		return $ ghost{
-			obj_direction = speed *| directionToSpeed newDir,
-			obj_state = GhostState{ ghost_dir_history= [(newDir, newLastDecision)] }
-		}
+		direction <- calcDirection :: m Direction
+		let newLastDecision =
+			if direction /= lastDir then obj_t ghost else lastDecision :: Float
+		return $
+			set (obj_state_l . ghost_dir_history_l) [(direction, newLastDecision)] $
+			moveObj (world_labyrinth world) dt ((normalizeDir . directionToSpeed) $ direction) speed ghost
 	where
-		speed :: Float
-		speed = 1
-
-movePacman :: DeltaT -> World -> World
-movePacman dt world@World{ world_pacman=pacMan } =
-	world {
-		world_pacman = moveCharacter dt world $ setDirection pacMan,
-		world_dbgInfo = DbgInf dbgText
-	}
-	where
-		setDirection :: Pacman -> Pacman
-		setDirection obj =
-			obj{
-				obj_direction =
-					speed *| (vecMap fromInteger $ directionsToSpeed $ world_userInput world)
-			}
-		dbgText = concat $
-			[ "userInput: ", show $ world_userInput world, "\n"
-			, "pos: ", show (obj_pos pacMan), "\n"
-			, "setDirection: ", show (setDirection pacMan), "\n"
-			]
 		speed = 2
-
-moveCharacter :: DeltaT -> World -> Object st -> Object st
-moveCharacter dt world obj =
-	obj{
-		obj_pos = newPos,
-		obj_t = (obj_t obj + dt)
-	}
-	where
-		newPos =
-			if (willCollide (world_labyrinth world) dt obj)
-			then obj_pos obj
-			else (pointInSizeF labSize $ obj_pos obj |+| (obj_direction obj) |* dt) -- pointInSize: torus
-				where
-					labSize = vecMap fromIntegral (mGetWidth lab, mGetHeight lab)
-					lab = world_labyrinth world
+		[(lastDir, lastDecision)] = ghost_dir_history $ obj_state $ ghost
+		calcDirection :: m Direction
+		calcDirection =
+			let
+				possibleDirs = possibleDirections (world_labyrinth world) (dt * speed) ghost :: [Direction]
+			in
+				if (obj_t ghost - lastDecision < 5) && (lastDir `elem` possibleDirs)
+					then return lastDir
+					else 
+						uniform $ possibleDirs
 
 possibleDirections :: Labyrinth -> DeltaT -> Object st -> [Direction]
 possibleDirections lab deltaT obj =
-	filter (not . willCollide lab deltaT . (\x -> obj{ obj_direction= x }) . directionToSpeed) $
+	filter (\dir -> not $ willCollide lab (normalizeDir $ directionToSpeed $ dir) deltaT obj)
 	allDirs
 
-willCollide :: Labyrinth -> DeltaT -> Object st -> Bool
-willCollide lab deltaT obj =
-	any (willPointCollide lab deltaT $ obj_direction obj) $
+movePacman :: DeltaT -> World -> World
+movePacman dt world =
+	(
+		set world_dbgInfo_l (DbgInf dbgText)
+		.
+		(over world_pacman_l $ moveObj (world_labyrinth world) dt dir speed)
+	) world
+	where
+		dir :: Speed Float
+		dir =
+			normalizeDir $ directionsToSpeed $ world_userInput world
+		speed = 2
+		dbgText = concat $
+			[ "userInput: ", show $ world_userInput world, "\n"
+			, "pos: ", show (obj_pos $ world_pacman world), "\n"
+			, "dir: ", show dir, "\n"
+			]
+
+normalizeDir :: Speed Float -> Speed Float
+normalizeDir dir =
+	if dir /= (0,0) then normalize $ dir else (0,0)
+
+moveObj :: Labyrinth -> DeltaT -> Speed Float -> Float -> Object st -> Object st
+moveObj labyrinth dt direction speed obj =
+	let newPos = 
+		if willCollide labyrinth direction (speed * dt) obj
+		then obj_pos obj
+		else
+			pointInSizeF (fromIntegral $ mGetWidth labyrinth, fromIntegral $ mGetHeight labyrinth) $ -- torus
+			(|+| (direction |* speed |* dt)) $
+			obj_pos obj
+	in
+		(
+			set obj_direction_l direction
+			.
+			over obj_t_l (+ dt)
+			.
+			set obj_pos_l newPos
+		)
+		obj
+
+willCollide :: Labyrinth -> Speed Float -> Float -> Object st -> Bool
+willCollide lab direction dt obj =
+	any (willPointCollide lab direction dt) $
 	rect (obj_pos obj) (obj_size obj)
 
-willPointCollide :: Labyrinth -> Float -> Speed Float -> Pos Float -> Bool
-willPointCollide lab deltaT dir oldPos =
-	(==Wall) $
-	mGet `flip` lab $
-	(\x -> if fst x<0 || snd x <0 || snd x > mGetWidth lab -1 || fst x > mGetWidth lab -1 then error $ concat ["index: ", show x, " oldPos: ", show oldPos, " nextPos: ", show nextPos] else x) $
-	calcMatrIndex $
-	nextPos
-	where
-		calcMatrIndex :: Pos Float -> MatrIndex
-		calcMatrIndex pos =
-			swap $
-			vecMap floor $
-			pointInSizeF (fromIntegral $ mGetWidth lab, fromIntegral $ mGetHeight lab) pos -- torus
-		nextPos :: Pos Float
-		nextPos = oldPos |+| (dir |* deltaT)
+willPointCollide :: Labyrinth -> Speed Float -> Float -> Pos Float -> Bool
+willPointCollide lab dir dt pos =
+	pointCollides lab $ 
+	pos |+| (dir |* dt)
+
+pointCollides :: Labyrinth -> Pos Float -> Bool
+pointCollides lab =
+	(==Wall) .
+	(mGet `flip` lab) .
+	swap .
+	vecMap floor .
+	pointInSizeF (fromIntegral $ mGetWidth lab, fromIntegral $ mGetHeight lab) -- torus
