@@ -16,6 +16,9 @@ import Data.List
 import Control.Monad.State
 import Control.Monad.Trans.Maybe
 
+import Lens.Micro.Platform
+
+
 genWorld :: Int -> World
 genWorld seed =
 	--flip evalRand (mkStdGen seed) $
@@ -26,16 +29,23 @@ genWorld' ::
 	Size Int -> Float
 	-> World
 genWorld' rndGen worldSize wallRatio =
-	let ((labyrinth, (pacmanPos:monsterPositions)), newRndGen) = runRand `flip` rndGen $
-		do
-			labyrinth <- genLabyrinth worldSize wallRatio
-			startPositions <-
-				randomSubSet 4 $
-				map swap $ 
-				filter ((==Free) . flip mGet labyrinth) $
-				mGetAllIndex labyrinth
-			return (labyrinth, startPositions)
-	in
+	let (world, newRndGen) =
+		runRand `flip` rndGen $ genWorld'' rndGen worldSize wallRatio
+	in set world_randomGen_l newRndGen world
+
+genWorld'' :: MonadRandom m => StdGen -> Size Int -> Float -> m World
+genWorld'' rndGen worldSize wallRatio =
+	do
+		labyrinth <- genLabyrinth worldSize wallRatio
+		let allFreePositions =
+			map swap $ 
+			filter ((==Free) . flip mGet labyrinth) $
+			mGetAllIndex labyrinth
+		startPositions@(pacmanPos : monsterPositions) <-
+			randomSubSet 5 $ allFreePositions
+		let dotPositions =
+			allFreePositions \\ startPositions
+		return $
 			World {
 				world_uiState = Menu,
 				world_level = 1,
@@ -45,12 +55,19 @@ genWorld' rndGen worldSize wallRatio =
 					(defObj (vecMap fromIntegral pacmanPos)),
 				world_ghosts =
 					map (defGhost . vecMap fromIntegral) monsterPositions,
-				world_dots = [],
+				world_dots =
+					map (set obj_size_l dotSize) $
+					map defObj $
+					map ((|-| (dotSize |/ 2)) . (|+| (0.5,0.5))) $
+					map (vecMap fromIntegral) $
+					dotPositions,
 				world_fruits= [],
 				world_dbgInfo = DbgInf{ info = "" },
 				world_userInput = [],
-				world_randomGen = newRndGen
+				world_randomGen = rndGen
 			}
+	where
+		dotSize = (0.2, 0.2)
 
 randomSubSet :: (MonadRandom m, Eq a) => Int -> [a] -> m [a]
 randomSubSet count list

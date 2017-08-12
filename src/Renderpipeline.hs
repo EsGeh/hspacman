@@ -81,6 +81,7 @@ renderGame world =
 			renderMenu
 		Playing ->
 			renderGameArea world
+		GameOver -> renderGameOverScreen world
 
 renderMenu :: Picture
 renderMenu =
@@ -88,10 +89,17 @@ renderMenu =
 		Color red $ Polygon $ rect (0,0) (1,1)
 	]
 
+renderGameOverScreen :: World -> Picture
+renderGameOverScreen world =
+	Pictures [
+		Color green $ Polygon $ rect (0,0) (1,1)
+	]
+
 renderGameArea :: World -> Picture
 renderGameArea world =
 	Pictures [
 		renderLabyrinth cellSize lab,
+		renderDots cellSize (world_dots world),
 		renderPacMan cellSize (world_pacman world),
 		renderGhosts cellSize (world_ghosts world)
 	]
@@ -99,6 +107,16 @@ renderGameArea world =
 		cellSize :: Size Float
 		cellSize = (1,1) |/| (fromIntegral $ mGetWidth lab, fromIntegral $ mGetHeight lab)
 		lab = world_labyrinth world 
+
+renderDots :: Size Float -> [Dot] -> Picture
+renderDots cellSize dots =
+	Pictures $ map renderDot dots
+	where
+		renderDot dot =
+			renderChar cellSize dot $
+			--Translate (1/2) (1/2) $
+			Color black $
+			ThickCircle (1/4) (1/2)
 
 renderPacMan :: Size Float -> Pacman -> Picture
 renderPacMan cellSize pacman =

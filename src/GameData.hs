@@ -110,7 +110,7 @@ defGhost :: Pos Float -> Ghost
 defGhost pos =
 	(defObj pos){ obj_state = GhostState{ ghost_dir_history = [ (Right, 0)] } }
 
-data UIState = Playing | Menu deriving(Show)
+data UIState = Playing | Menu | GameOver deriving(Show)
 
 makeLensesWith lensRules' ''World
 makeLensesWith lensRules' ''Object

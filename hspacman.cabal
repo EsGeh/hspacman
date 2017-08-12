@@ -20,7 +20,9 @@ executable hspacman
     LevelGenerator,
     RandomUtils,
     Renderpipeline,
-    Vector2D
+    Vector2D,
+    Move,
+    Lens
   -- other-modules:       
   build-depends:
     base == 4.9.*,
