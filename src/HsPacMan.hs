@@ -15,6 +15,7 @@ import Graphics.Gloss hiding(display)
 import Graphics.Gloss.Interface.Pure.Game hiding(Up,Down)
 import qualified Graphics.Gloss.Interface.Pure.Game as G
 
+import Control.Monad.Random
 import Data.List
 
 
@@ -36,22 +37,25 @@ framerate = 40
 
 main :: IO ()
 main =
-	play
-		display
-		bgColour
-		framerate
-		Menu
-		(Renderpipeline.render windowSize) -- calls renderWorld from Module Renderpipeline
-		handleInput
-		move
+	do
+		--let seed = 0
+		seed <- getRandom
+		play
+			display
+			bgColour
+			framerate
+			Menu
+			(Renderpipeline.render windowSize) -- calls renderWorld from Module Renderpipeline
+			(handleInput seed)
+			move
 
 move :: DeltaT -> GameState -> GameState
 move dt = \case
 	Playing world -> Move.moveWorld dt world
 	x -> x
 
-handleInput :: Event -> GameState -> GameState
-handleInput event state =
+handleInput :: Int -> Event -> GameState -> GameState
+handleInput seed event state =
 	case event of
 		(EventKey key upOrDown _ _) -> case state of
 			Playing world ->
@@ -77,18 +81,18 @@ handleInput event state =
 			Menu -> case upOrDown of
 				G.Down -> case key of
 					Char 's' ->
-						Playing $ LevelGenerator.genWorld 8 $ worldParamsFromDifficulty 1
+						Playing $ LevelGenerator.genWorld seed $ worldParamsFromDifficulty 1
 					_ -> state
 				_ -> state
 			GameOver statistics ->
 				case key of
 					Char 's' ->
-						Playing $ LevelGenerator.genWorld 8 $ worldParamsFromDifficulty $ world_level statistics
+						Playing $ LevelGenerator.genWorld seed $ worldParamsFromDifficulty $ world_level statistics
 					_ -> state
 			Won statistics ->
 				case key of
 					Char 's' ->
-						Playing $ LevelGenerator.genWorld 8 $ worldParamsFromDifficulty $ (+1) $ world_level statistics
+						Playing $ LevelGenerator.genWorld seed $ worldParamsFromDifficulty $ (+1) $ world_level statistics
 					_ -> state
 		_ -> state
 
@@ -98,15 +102,16 @@ worldParamsFromDifficulty level =
 		LevelGenerator.worldParams_level = level,
 		LevelGenerator.worldParams_size = (worldSize, worldSize),
 		LevelGenerator.worldParams_wallRatio = wallRatio,
-		LevelGenerator.worldParams_ghostCount = level + 1,
-		LevelGenerator.worldParams_pacmanSpeed =
-			1 + (fromIntegral level) * 0.2,
-		LevelGenerator.worldParams_ghostsSpeed =
-			1 + ((fromIntegral level) - 1) * 0.2
+		LevelGenerator.worldParams_ghostCount = floor $ ghostRatio * (fromIntegral $ worldSize*worldSize),
+		LevelGenerator.worldParams_pacmanSpeed = speed,
+		LevelGenerator.worldParams_ghostsSpeed = speed * 0.9
 	}
 	where
-		worldSize = level*2 + 5
+		speed =
+			1.5 + (fromIntegral level) * 0.2
+		worldSize = level*2 + 10
 		wallRatio = 0.6
+		ghostRatio = 1/60 :: Float
 
 -- |changes the moving direction of the pacman
 setPacDir :: World -> Speed Float -> World
