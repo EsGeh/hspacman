@@ -3,7 +3,7 @@
 module Main where
 
 import GameData
-import LevelGenerator
+import qualified LevelGenerator
 import Renderpipeline
 import qualified Move
 -- import SGData.Vector2D hiding ( (*|), (|*) )
@@ -31,7 +31,7 @@ main =
 		display
 		bgColour
 		framerate
-		(genWorldFromLevel 0 1)
+		(LevelGenerator.genWorld 0 $ worldParamsFromDifficulty 1)
 		(renderWorld windowSize) -- calls renderWorld from Module Renderpipeline
 		handleInput
 		Move.moveWorld
@@ -45,19 +45,12 @@ bgColour = black
 framerate :: Int
 framerate = 40
 
-genWorldFromLevel :: Int -> Int -> World
-genWorldFromLevel seed level =
-	genWorld seed (worldSize, worldSize) wallRatio
-	where
-		worldSize = level*2 + 10
-		wallRatio = 0.3
-
 handleInput :: Event -> World -> World
 handleInput event world = case event of
 	(EventKey key upOrDown _ _) -> case (world_uiState world) of
 		Menu -> case upOrDown of
 			G.Down -> case key of
-				Char 's' -> setUIState (genWorldFromLevel 8 1) Playing
+				Char 's' -> setUIState (LevelGenerator.genWorld 8 $ worldParamsFromDifficulty 1) Playing
 				_ -> world --alternative menue
 			_ -> world --alternative menue
 		Playing -> case upOrDown of
@@ -77,17 +70,29 @@ handleInput event world = case event of
 				_ -> world
 		GameOver ->
 			case key of
-				Char 's' -> setUIState (genWorldFromLevel 8 1) Playing
+				Char 's' -> setUIState (LevelGenerator.genWorld 8 $ worldParamsFromDifficulty 1) Playing
 				_ -> world
 		Won ->
 			case key of
-				Char 's' -> setUIState (genWorldFromLevel 8 $ (+1) $ world_level world) Playing
+				Char 's' -> setUIState (LevelGenerator.genWorld 8 $ worldParamsFromDifficulty $ (+1) $ world_level world) Playing
 				_ -> world
 		where
 			addDir dir = [dir] `union` (remDir $ opposite dir)
 			remDir dir = filter (/=dir) currentKeys
 			currentKeys = world_userInput world
 	_ -> world
+
+worldParamsFromDifficulty :: Int -> LevelGenerator.WorldParams
+worldParamsFromDifficulty level =
+	LevelGenerator.WorldParams{
+		LevelGenerator.worldParams_level = level,
+		LevelGenerator.worldParams_size = (worldSize, worldSize),
+		LevelGenerator.worldParams_wallRatio = wallRatio,
+		LevelGenerator.worldParams_ghostCount = level + 1
+	}
+	where
+		worldSize = level*2 + 5
+		wallRatio = 0.6
 
 
 setUIState :: World -> UIState -> World
