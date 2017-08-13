@@ -68,16 +68,20 @@ handleInput seed event state =
 							Char 'a' -> addDir Left
 							Char 'd' -> addDir Right
 							_ -> id
+						{-
 						G.Up -> case key of
 							Char 'w' -> remDir Up
 							Char 's' -> remDir Down
 							Char 'a' -> remDir Left
 							Char 'd' -> remDir Right
 							_ -> id
+						-}
 						_ -> id
 						where
 							-- addDir dir = const [dir]
-							addDir dir = ([dir] `union`) . (remDir $ opposite dir)
+							addDir dir =
+								(dir:) . (remDir $ opposite dir)
+								-- ([dir] `union`) . (remDir $ opposite dir)
 							remDir dir = filter (/=dir)
 			Menu -> case upOrDown of
 				G.Down -> case key of

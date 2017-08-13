@@ -9,6 +9,7 @@ import SGData.Matrix
 import Prelude hiding(Left,Right)
 
 import Data.Tuple
+import Data.Maybe
 import Control.Monad.Random
 
 import Lens.Micro.Platform
@@ -16,11 +17,21 @@ import Lens.Micro.Platform
 
 moveWorld :: DeltaT -> World -> GameState
 moveWorld deltaT =
+	maybeEndGame
+	.
 	movePacman deltaT
 	.
 	moveGhosts deltaT
 	.
 	over world_t_l (+ deltaT)
+	where
+		maybeEndGame world =
+			if isWon world
+				then Won (world_statistics world)
+				else
+					if isGameOver world
+					then GameOver $ world_statistics world
+					else Playing world
 
 moveGhosts :: DeltaT -> World -> World
 moveGhosts dt world =
@@ -38,7 +49,8 @@ moveGhost world dt ghost =
 			if direction /= lastDir then world_t world else lastDecision :: Float
 		return $
 			set (obj_state_l . ghost_dir_history_l) [(direction, newLastDecision)] $
-			moveObjInsideWalls (world_labyrinth world) dt ((normalizeDir . directionToSpeed) $ direction) speed ghost
+			moveObjSimple torusSize ((normalizeDir . directionToSpeed) $ direction) (speed * dt) ghost
+			--moveObjInsideWalls (world_labyrinth world) dt ((normalizeDir . directionToSpeed) $ direction) speed ghost
 	where
 		speed :: Float
 		speed = world_ghostSpeed world
@@ -46,20 +58,50 @@ moveGhost world dt ghost =
 		calcDirection :: m Direction
 		calcDirection =
 			let
-				possibleDirs = possibleDirections (world_labyrinth world) (dt * speed) ghost :: [Direction]
+				possibleDirs = possibleDirections labyrinth (dt * speed) ghost :: [Direction]
 			in
 				if (world_t world - lastDecision < 5) && (lastDir `elem` possibleDirs)
 					then return lastDir
 					else 
 						uniform $ possibleDirs
+		torusSize = (fromIntegral $ mGetWidth labyrinth, fromIntegral $ mGetHeight labyrinth)
+		labyrinth = world_labyrinth world
 
 possibleDirections :: Labyrinth -> DeltaT -> Object st -> [Direction]
 possibleDirections lab deltaT obj =
 	filter (\dir -> not $ willCollideWithLabyrinth lab (normalizeDir $ directionToSpeed $ dir) deltaT obj)
 	allDirs
 
-movePacman :: DeltaT -> World -> GameState
+movePacman :: DeltaT -> World -> World
 movePacman dt world =
+	maybeEatDot $
+	fromMaybe world $
+	--traverseOf world_pacman_l `flip` world $ \pacman ->
+	do
+		primaryDir <- listToMaybe userInput :: Maybe Direction
+		if primaryDir `elem` possibleDirs
+			then return $ over world_pacman_l `flip` world $ moveObjSimple torusSize (normalizeDir $ directionToSpeed primaryDir) (world_pacmanSpeed world * dt)
+			else
+				do
+					secondaryDir <- listToMaybe $ tail userInput
+					if secondaryDir `elem` possibleDirs
+						then return $
+							-- over world_userInput_l tail $
+							over world_pacman_l `flip` world $
+							moveObjSimple torusSize (normalizeDir $ directionToSpeed secondaryDir) (world_pacmanSpeed world * dt)
+						else
+							Nothing
+	where
+		possibleDirs =
+			possibleDirections (world_labyrinth world) (dt * speed) (world_pacman world) :: [Direction]
+		userInput = world_userInput world :: [Direction]
+		speed =
+			world_pacmanSpeed world
+		torusSize = (fromIntegral $ mGetWidth labyrinth, fromIntegral $ mGetHeight labyrinth)
+		labyrinth = world_labyrinth world
+		pacman = world_pacman world
+
+{-
 	let
 		newWorld =
 			(
@@ -87,13 +129,15 @@ movePacman dt world =
 			, "pos: ", show (obj_pos $ world_pacman world), "\n"
 			, "dir: ", show dir, "\n"
 			]
-		maybeEatDot world' =
-			let 
-				pacman_pos = obj_pos $ world_pacman world'
-				pacman_size = obj_size $ world_pacman world'
-			in
-				over world_dots_l `flip` world' $ filter $ \dot ->
-				not $ rectCollidesRect (pacman_pos, pacman_size) (obj_pos dot, obj_size dot)
+-}
+
+maybeEatDot world =
+	let 
+		pacman_pos = obj_pos $ world_pacman world
+		pacman_size = obj_size $ world_pacman world
+	in
+		over world_dots_l `flip` world $ filter $ \dot ->
+		not $ rectCollidesRect (pacman_pos, pacman_size) (obj_pos dot, obj_size dot)
 
 isWon :: World -> Bool
 isWon world = (sum $ map (const 1) $ world_dots world) == (0 :: Int)
@@ -108,6 +152,23 @@ isGameOver world =
 		map `flip` world_ghosts world $
 		\ghost -> (obj_pos ghost, obj_size ghost)
 
+{-
+moveObjInsideWallsMaybe :: Labyrinth -> DeltaT -> Speed Float -> Float -> Object st -> Maybe (Object st)
+moveObjInsideWallsMaybe labyrinth dt direction speed obj =
+	if willCollideWithLabyrinth labyrinth direction (speed * dt) obj
+	then Nothing
+	else return $ moveObjSimple torusSize direction (speed * dt) obj
+	where
+		torusSize = (fromIntegral $ mGetWidth labyrinth, fromIntegral $ mGetHeight labyrinth)
+-}
+		
+moveObjSimple torusSize direction speed obj =
+	set obj_direction_l direction $
+	over obj_pos_l `flip` obj $ 
+	pointInSizeF torusSize . -- torus
+	(|+| (direction |* speed ))
+
+{-
 moveObjInsideWalls :: Labyrinth -> DeltaT -> Speed Float -> Float -> Object st -> Object st
 moveObjInsideWalls labyrinth dt direction speed obj =
 	(
@@ -121,6 +182,7 @@ moveObjInsideWalls labyrinth dt direction speed obj =
 		set obj_direction_l direction
 	)
 	obj
+-}
 
 normalizeDir :: Speed Float -> Speed Float
 normalizeDir dir =
