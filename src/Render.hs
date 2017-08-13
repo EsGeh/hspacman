@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Renderpipeline where
+module Render where
 
 import GameData
 import Vector2D

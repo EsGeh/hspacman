@@ -13,13 +13,13 @@ extra-source-files:  README.md
 cabal-version:       >=1.10
 
 executable hspacman
-  main-is:             HsPacMan.hs
+  main-is:             Main.hs
   --exposed-modules:       
   other-modules:       
     GameData,
     LevelGenerator,
     RandomUtils,
-    Renderpipeline,
+    Render,
     Vector2D,
     Move,
     Lens

@@ -5,7 +5,7 @@ module Main where
 
 import GameData
 import qualified LevelGenerator
-import qualified Renderpipeline
+import qualified Render
 import qualified Move
 import Vector2D
 
@@ -45,7 +45,7 @@ main =
 			bgColour
 			framerate
 			Menu
-			(Renderpipeline.render windowSize) -- calls renderWorld from Module Renderpipeline
+			(Render.render windowSize) -- calls renderWorld from Module Renderpipeline
 			(handleInput seed)
 			move
 
