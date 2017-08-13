@@ -54,6 +54,7 @@ data GameState
 
 data World = World {
 	world_userInput :: CurrentKeys,
+	world_t :: Time,
 	world_statistics :: Statistics,
 	world_labyrinth :: Labyrinth,
 	world_pacman :: Pacman,
@@ -97,7 +98,7 @@ data Object objState = Object {
 	obj_pos :: Pos Float,
 	obj_size :: Size Float,
 	obj_direction :: Speed Float,
-	obj_t :: Time,
+	--obj_t :: Time,
 	obj_state :: objState
 } deriving(Show)
 
@@ -116,7 +117,7 @@ defObj pos = Object{
 	obj_pos = pos |+| (0.1, 0.1) ,
 	obj_size = (0.8,0.8),
 	obj_direction = (0,0),
-	obj_t = 0,
+	-- obj_t = 0,
 	obj_state = ()
 }
 defGhost :: Pos Float -> Ghost

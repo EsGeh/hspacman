@@ -79,6 +79,7 @@ genWorld'' rndGen WorldParams{..} =
 				world_fruits= [],
 				world_dbgInfo = DbgInf{ info = "" },
 				world_userInput = [],
+				world_t = 0,
 				world_randomGen = rndGen
 			}
 	where

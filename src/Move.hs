@@ -19,6 +19,8 @@ moveWorld deltaT =
 	movePacman deltaT
 	.
 	moveGhosts deltaT
+	.
+	over world_t_l (+ deltaT)
 
 moveGhosts :: DeltaT -> World -> World
 moveGhosts dt world =
@@ -33,7 +35,7 @@ moveGhost world dt ghost =
 	do
 		direction <- calcDirection :: m Direction
 		let newLastDecision =
-			if direction /= lastDir then obj_t ghost else lastDecision :: Float
+			if direction /= lastDir then world_t world else lastDecision :: Float
 		return $
 			set (obj_state_l . ghost_dir_history_l) [(direction, newLastDecision)] $
 			moveObjInsideWalls (world_labyrinth world) dt ((normalizeDir . directionToSpeed) $ direction) speed ghost
@@ -46,7 +48,7 @@ moveGhost world dt ghost =
 			let
 				possibleDirs = possibleDirections (world_labyrinth world) (dt * speed) ghost :: [Direction]
 			in
-				if (obj_t ghost - lastDecision < 5) && (lastDir `elem` possibleDirs)
+				if (world_t world - lastDecision < 5) && (lastDir `elem` possibleDirs)
 					then return lastDir
 					else 
 						uniform $ possibleDirs
@@ -117,8 +119,6 @@ moveObjInsideWalls labyrinth dt direction speed obj =
 			)
 		.
 		set obj_direction_l direction
-		.
-		over obj_t_l (+ dt)
 	)
 	obj
 

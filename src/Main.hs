@@ -16,6 +16,7 @@ import Graphics.Gloss.Interface.Pure.Game hiding(Up,Down)
 import qualified Graphics.Gloss.Interface.Pure.Game as G
 
 import Control.Monad.Random
+import Lens.Micro.Platform
 import Data.List
 
 
@@ -59,25 +60,25 @@ handleInput seed event state =
 	case event of
 		(EventKey key upOrDown _ _) -> case state of
 			Playing world ->
-				Playing $ case upOrDown of
-					G.Down -> case key of
-						Char 'w' -> world{ world_userInput= addDir Up }
-						Char 's' -> world{ world_userInput= addDir Down }
-						Char 'a' -> world{ world_userInput= addDir Left }
-						Char 'd' -> world{ world_userInput= addDir Right }
-						SpecialKey KeySpace -> setPacDir world (0,0)
-						_ -> world
-					G.Up -> case key of
-						Char 'w' -> world{ world_userInput= remDir Up }
-						Char 's' -> world{ world_userInput= remDir Down }
-						Char 'a' -> world{ world_userInput= remDir Left }
-						Char 'd' -> world{ world_userInput= remDir Right }
-						SpecialKey KeySpace -> setPacDir world (0,0)
-						_ -> world
-					where
-						addDir dir = [dir] `union` (remDir $ opposite dir)
-						remDir dir = filter (/=dir) currentKeys
-						currentKeys = world_userInput world
+				Playing $ over world_userInput_l `flip` world $
+					case upOrDown of
+						G.Down -> case key of
+							Char 'w' -> addDir Up
+							Char 's' -> addDir Down
+							Char 'a' -> addDir Left
+							Char 'd' -> addDir Right
+							_ -> id
+						G.Up -> case key of
+							Char 'w' -> remDir Up
+							Char 's' -> remDir Down
+							Char 'a' -> remDir Left
+							Char 'd' -> remDir Right
+							_ -> id
+						_ -> id
+						where
+							-- addDir dir = const [dir]
+							addDir dir = ([dir] `union`) . (remDir $ opposite dir)
+							remDir dir = filter (/=dir)
 			Menu -> case upOrDown of
 				G.Down -> case key of
 					Char 's' ->

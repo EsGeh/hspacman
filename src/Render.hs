@@ -109,7 +109,7 @@ renderGameArea world =
 	Pictures [
 		renderLabyrinth cellSize lab,
 		renderDots cellSize (world_dots world),
-		renderPacMan cellSize (world_pacman world),
+		renderPacMan cellSize (world_t world) (world_pacman world),
 		renderGhosts cellSize (world_ghosts world)
 	]
 	where
@@ -126,8 +126,8 @@ renderDots cellSize dots =
 			Color black $
 			ThickCircle (1/4) (1/2)
 
-renderPacMan :: Size Float -> Pacman -> Picture
-renderPacMan cellSize pacman =
+renderPacMan :: Size Float -> Time -> Pacman -> Picture
+renderPacMan cellSize time pacman =
 	renderChar cellSize pacman $
 	Translate (1/2) (1/2) $
 	Rotate rotateAngle $
@@ -138,7 +138,7 @@ renderPacMan cellSize pacman =
 		(1/4) -- radius ?
 		(1/2) -- line width ?
 	where
-		mouthAngle = 90 * (sin $ 5 * obj_t pacman) -- [(-90)..90]
+		mouthAngle = 90 * (sin $ 5 * time) -- [(-90)..90]
 		rotateAngle =
 			case vecMap signum $ obj_direction pacman of
 				(1,0) -> 0
