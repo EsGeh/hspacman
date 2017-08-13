@@ -16,7 +16,6 @@ renderWorld wSize world =
 	Pictures $
 	[
 		fitToArea (-1/2, -1/2) (vecX wSize, -vecY wSize) $
-		--fitToArea (0,textHeight) (1, 1-textHeight) $
 		uncurry fitToArea gameArea $
 		renderGame world,
 		renderDbgText wSize textArea (world_dbgInfo world)
@@ -33,13 +32,6 @@ renderDbgText :: Vec Float -> (Vec Float, Vec Float) -> DebugInfo -> Picture
 renderDbgText wSize textArea dbgInfo =
 	Pictures $
 	[
-		{-
-		fitToArea (-1/2, -1/2) (vecX wSize, -vecY wSize) $
-		uncurry fitToArea textArea $
-		Color white $
-			Line $ rect (0,0) (1,1),
-		-}
-		--Translate 0 lineHeight $
 		Pictures $
 		adjustTextLines $
 		map (
@@ -82,17 +74,27 @@ renderGame world =
 		Playing ->
 			renderGameArea world
 		GameOver -> renderGameOverScreen world
+		Won -> renderGameWon world
 
 renderMenu :: Picture
 renderMenu =
-	Pictures [
-		Color red $ Polygon $ rect (0,0) (1,1)
+	Pictures $
+	[ Color red $ Polygon $ rect (0,0) (1,1)
+	, Translate 0.1 0.5 $ Scale 0.0005 (-0.0005) $ Color green $ Text "press 's' to start"
 	]
 
 renderGameOverScreen :: World -> Picture
 renderGameOverScreen world =
 	Pictures [
 		Color green $ Polygon $ rect (0,0) (1,1)
+	, Translate 0.1 0.5 $ Scale 0.0005 (-0.0005) $ Color red $ Text "GAME OVER! (to retry press 's')"
+	]
+
+renderGameWon :: World -> Picture
+renderGameWon world =
+	Pictures [
+		Color green $ Polygon $ rect (0,0) (1,1)
+	, Translate 0.1 0.5 $ Scale 0.0005 (-0.0005) $ Color red $ Text "You won, fucker!"
 	]
 
 renderGameArea :: World -> Picture
@@ -114,7 +116,6 @@ renderDots cellSize dots =
 	where
 		renderDot dot =
 			renderChar cellSize dot $
-			--Translate (1/2) (1/2) $
 			Color black $
 			ThickCircle (1/4) (1/2)
 

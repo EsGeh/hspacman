@@ -23,17 +23,18 @@ windowTitle = "hsPacMan"
 windowPos :: Pos Float
 windowPos = (100, 100) 
 windowSize :: Pos Float
-windowSize = (800, 600)
+windowSize = (1000, 800)
 
 main :: IO ()
-main = play
-	display
-	bgColour
-	framerate
-	(genWorld 0)
-	(renderWorld windowSize) -- calls renderWorld from Module Renderpipeline
-	handleInput
-	Move.moveWorld
+main =
+	play
+		display
+		bgColour
+		framerate
+		(genWorldFromLevel 0 1)
+		(renderWorld windowSize) -- calls renderWorld from Module Renderpipeline
+		handleInput
+		Move.moveWorld
 
 display :: Display
 display = InWindow windowTitle (vecMap floor windowSize) (vecMap floor windowPos)
@@ -44,12 +45,19 @@ bgColour = black
 framerate :: Int
 framerate = 40
 
+genWorldFromLevel :: Int -> Int -> World
+genWorldFromLevel seed level =
+	genWorld seed (worldSize, worldSize) wallRatio
+	where
+		worldSize = level*2 + 10
+		wallRatio = 0.3
+
 handleInput :: Event -> World -> World
 handleInput event world = case event of
 	(EventKey key upOrDown _ _) -> case (world_uiState world) of
 		Menu -> case upOrDown of
 			G.Down -> case key of
-				Char 's' -> setUIState (genWorld 8) Playing
+				Char 's' -> setUIState (genWorldFromLevel 8 1) Playing
 				_ -> world --alternative menue
 			_ -> world --alternative menue
 		Playing -> case upOrDown of
@@ -67,7 +75,14 @@ handleInput event world = case event of
 				Char 'd' -> world{ world_userInput= remDir Right }
 				SpecialKey KeySpace -> setPacDir world (0,0)
 				_ -> world
-		GameOver -> world
+		GameOver ->
+			case key of
+				Char 's' -> setUIState (genWorldFromLevel 8 1) Playing
+				_ -> world
+		Won ->
+			case key of
+				Char 's' -> setUIState (genWorldFromLevel 8 $ (+1) $ world_level world) Playing
+				_ -> world
 		where
 			addDir dir = [dir] `union` (remDir $ opposite dir)
 			remDir dir = filter (/=dir) currentKeys

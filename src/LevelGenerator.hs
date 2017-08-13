@@ -19,10 +19,14 @@ import Control.Monad.Trans.Maybe
 import Lens.Micro.Platform
 
 
-genWorld :: Int -> World
+genWorld ::
+	Int
+	-> Size Int -> Float
+	-> World
 genWorld seed =
 	--flip evalRand (mkStdGen seed) $
-	genWorld' (mkStdGen seed) (20,20) 0.4
+	genWorld' (mkStdGen seed)
+	-- genWorld' (mkStdGen seed) (10,10) 0.3
 
 genWorld' ::
 	StdGen ->
@@ -42,7 +46,7 @@ genWorld'' rndGen worldSize wallRatio =
 			filter ((==Free) . flip mGet labyrinth) $
 			mGetAllIndex labyrinth
 		startPositions@(pacmanPos : monsterPositions) <-
-			randomSubSet 5 $ allFreePositions
+			randomSubSet 4 $ allFreePositions
 		let dotPositions =
 			allFreePositions \\ startPositions
 		return $
@@ -98,19 +102,31 @@ randomTunnels :: (MonadRandom m) => Float -> Labyrinth -> m Labyrinth
 randomTunnels wallRatio lab =
 	if currentWallRatio <= wallRatio
 	then return lab
-	else
-		do
-			randomPos <- uniform $ map swap $ mGetAllIndex lab
-			let oneStepLeft = movePoint (width,height) randomPos (directionToSpeed Left)
-			lab' <-
-				boreTunnel oneStepLeft Left
-				=<<
-				boreTunnel randomPos Right lab
-			randomTunnels wallRatio lab' -- <- recursion !
+	else randomTunnels wallRatio =<< randomTunnelsStep lab
 	where
 		currentWallRatio = (fromIntegral countWall) / (fromIntegral $ width*height)
 		countWall = sum $ fmap fromEnum lab
 		(width,height) = (mGetWidth lab, mGetHeight lab)
+
+randomTunnelsStep :: MonadRandom m => Labyrinth -> m Labyrinth
+randomTunnelsStep lab =
+	do
+		randomPos <-
+			uniform $
+			map swap $ 
+			-- filter ((==Wall) . flip mGet lab) $
+			mGetAllIndex lab
+		let oneStepLeft = movePoint (width,height) randomPos (directionToSpeed Left)
+		boreTunnel oneStepLeft Left
+			=<<
+			boreTunnel randomPos Right lab
+	where
+		(width,height) = (mGetWidth lab, mGetHeight lab)
+
+{-
+type ColoredLab = Matrix Color
+type Color = Int
+-}
 
 boreTunnel ::
 	MonadRandom m =>
@@ -124,7 +140,7 @@ boreTunnel pos0 favDir matr =
 			lastDir = favDir,
 			pos = pos0
 		} $
-		runWorm (wormStep favDir 0.95) $
+		runWorm (wormStep favDir 1) $
 		mSet (swap pos0) Free matr
 
 -- runs a worm until its "dead" ( = returns "Nothing"):
@@ -178,12 +194,3 @@ wormBehaviour favDir prop WormStatus{..} matr =
 		[forwardPos, leftPos, rightPos] =
 			map (movePoint (mGetWidth matr, mGetHeight matr) pos . directionToSpeed) $
 				[lastDir, leftOf lastDir, rightOf lastDir]
-
--- tests if a position is inside a given area:
-{-
-inBox :: Area -> Pos -> Bool
-inBox (posBox,sizeBox) pos = (pos `vecGOE` posBox) && (pos `vecSOE` (posBox |+| sizeBox))
-	where
-		vecGOE l r = (vecX l >= vecX r) && (vecY l >= vecY r)
-		vecSOE l r = (vecX l <= vecX r) && (vecY l <= vecY r)
--}

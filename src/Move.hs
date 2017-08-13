@@ -58,6 +58,8 @@ possibleDirections lab deltaT obj =
 movePacman :: DeltaT -> World -> World
 movePacman dt world =
 	(
+		if isWon then set world_uiState_l Won else id
+		.
 		if isGameOver then set world_uiState_l GameOver else id
 		.
 		maybeEatDot
@@ -70,12 +72,13 @@ movePacman dt world =
 		dir :: Speed Float
 		dir =
 			normalizeDir $ directionsToSpeed $ world_userInput world
-		speed = 2
+		speed = 3
 		dbgText = concat $
 			[ "userInput: ", show $ world_userInput world, "\n"
 			, "pos: ", show (obj_pos $ world_pacman world), "\n"
 			, "dir: ", show dir, "\n"
 			]
+		isWon = (sum $ map (const 1) $ world_dots world) == (0 :: Int)
 		isGameOver =
 			let 
 				pacman_pos = obj_pos $ world_pacman world
