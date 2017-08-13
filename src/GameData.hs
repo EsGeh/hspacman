@@ -45,20 +45,33 @@ orthogonal d = [ ret | ret<-allDirs, ret/=d, ret/=opposite d ]
 allDirs :: [Direction]
 allDirs = [Up,Down,Left,Right]
 
+data GameState
+	= Playing World
+	| Menu
+	| GameOver Statistics
+	| Won Statistics
+	-- deriving(Show)
+
 data World = World {
-	world_uiState :: UIState,
 	world_userInput :: CurrentKeys,
-	world_level :: Level,
-	world_points :: Points,
+	world_statistics :: Statistics,
 	world_labyrinth :: Labyrinth,
 	world_pacman :: Pacman,
 	world_ghosts :: [Ghost],
 	world_dots :: [Dot],
 	world_fruits :: [Fruit],
+	world_pacmanSpeed :: Float,
+	world_ghostSpeed :: Float,
 	world_dbgInfo :: DebugInfo,
 	world_randomGen :: StdGen
 }
 	-- deriving(Show)
+
+data Statistics = Statistics {
+	world_level :: Level,
+	world_points :: Points
+}
+	deriving(Show)
 
 type CurrentKeys = [Direction]
 
@@ -110,7 +123,7 @@ defGhost :: Pos Float -> Ghost
 defGhost pos =
 	(defObj pos){ obj_state = GhostState{ ghost_dir_history = [ (Right, 0)] } }
 
-data UIState = Playing | Menu | GameOver | Won deriving(Show)
+--data UIState = Playing | Menu | GameOver | Won deriving(Show)
 
 makeLensesWith lensRules' ''World
 makeLensesWith lensRules' ''Object

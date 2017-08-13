@@ -14,7 +14,7 @@ import Control.Monad.Random
 import Lens.Micro.Platform
 
 
-moveWorld :: DeltaT -> World -> World
+moveWorld :: DeltaT -> World -> GameState
 moveWorld deltaT =
 	movePacman deltaT
 	.
@@ -38,7 +38,8 @@ moveGhost world dt ghost =
 			set (obj_state_l . ghost_dir_history_l) [(direction, newLastDecision)] $
 			moveObjInsideWalls (world_labyrinth world) dt ((normalizeDir . directionToSpeed) $ direction) speed ghost
 	where
-		speed = 2
+		speed :: Float
+		speed = world_ghostSpeed world
 		[(lastDir, lastDecision)] = ghost_dir_history $ obj_state $ ghost
 		calcDirection :: m Direction
 		calcDirection =
@@ -55,46 +56,56 @@ possibleDirections lab deltaT obj =
 	filter (\dir -> not $ willCollideWithLabyrinth lab (normalizeDir $ directionToSpeed $ dir) deltaT obj)
 	allDirs
 
-movePacman :: DeltaT -> World -> World
+movePacman :: DeltaT -> World -> GameState
 movePacman dt world =
-	(
-		if isWon then set world_uiState_l Won else id
-		.
-		if isGameOver then set world_uiState_l GameOver else id
-		.
-		maybeEatDot
-		.
-		set world_dbgInfo_l (DbgInf dbgText)
-		.
-		(over world_pacman_l $ moveObjInsideWalls (world_labyrinth world) dt dir speed)
-	) world
+	let
+		newWorld =
+			(
+				maybeEatDot
+				.
+				set world_dbgInfo_l (DbgInf dbgText)
+				.
+				(over world_pacman_l $ moveObjInsideWalls (world_labyrinth world) dt dir speed)
+			) world
+	in
+		if isWon newWorld
+			then Won $ world_statistics newWorld
+			else
+				if isGameOver newWorld
+				then GameOver $ world_statistics newWorld
+				else Playing newWorld
 	where
 		dir :: Speed Float
 		dir =
 			normalizeDir $ directionsToSpeed $ world_userInput world
-		speed = 3
+		speed =
+			world_pacmanSpeed world
 		dbgText = concat $
 			[ "userInput: ", show $ world_userInput world, "\n"
 			, "pos: ", show (obj_pos $ world_pacman world), "\n"
 			, "dir: ", show dir, "\n"
 			]
-		isWon = (sum $ map (const 1) $ world_dots world) == (0 :: Int)
-		isGameOver =
+		maybeEatDot world' =
 			let 
-				pacman_pos = obj_pos $ world_pacman world
-				pacman_size = obj_size $ world_pacman world
+				pacman_pos = obj_pos $ world_pacman world'
+				pacman_size = obj_size $ world_pacman world'
 			in
-				any (rectCollidesRect (pacman_pos, pacman_size)) $
-				map `flip` world_ghosts world $
-				\ghost -> (obj_pos ghost, obj_size ghost)
-		maybeEatDot world =
-			let 
-				pacman_pos = obj_pos $ world_pacman world
-				pacman_size = obj_size $ world_pacman world
-			in
-				over world_dots_l `flip` world $ filter $ \dot ->
+				over world_dots_l `flip` world' $ filter $ \dot ->
 				not $ rectCollidesRect (pacman_pos, pacman_size) (obj_pos dot, obj_size dot)
-			
+
+isWon :: World -> Bool
+isWon world = (sum $ map (const 1) $ world_dots world) == (0 :: Int)
+
+isGameOver :: World -> Bool
+isGameOver world =
+	let 
+		pacman_pos = obj_pos $ world_pacman world
+		pacman_size = obj_size $ world_pacman world
+	in
+		any (rectCollidesRect (pacman_pos, pacman_size)) $
+		map `flip` world_ghosts world $
+		\ghost -> (obj_pos ghost, obj_size ghost)
+
 moveObjInsideWalls :: Labyrinth -> DeltaT -> Speed Float -> Float -> Object st -> Object st
 moveObjInsideWalls labyrinth dt direction speed obj =
 	(

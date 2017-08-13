@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Renderpipeline where
 
 import GameData
@@ -11,14 +12,14 @@ import Graphics.Gloss hiding(display)
 
 type WindowSize = Vec Float
 
-renderWorld :: WindowSize -> World -> Picture
-renderWorld wSize world =
+render :: WindowSize -> GameState -> Picture
+render wSize state =
 	Pictures $
 	[
 		fitToArea (-1/2, -1/2) (vecX wSize, -vecY wSize) $
 		uncurry fitToArea gameArea $
-		renderGame world,
-		renderDbgText wSize textArea (world_dbgInfo world)
+		renderGame state
+		-- renderDbgText wSize textArea (world_dbgInfo world)
 	]
 	where
 		gameArea :: (Vec Float, Vec Float)
@@ -27,6 +28,30 @@ renderWorld wSize world =
 		textArea = ((0,0), (1, textHeight))
 		textHeight :: Float
 		textHeight = 0.1
+
+renderGame :: GameState -> Picture
+renderGame = \case
+	Playing world -> renderGameArea world
+	Menu -> renderMenu
+	GameOver statistics -> renderGameOverScreen
+	Won statistics -> renderGameWon
+
+{-
+	case (world_uiState world) of
+		Menu ->
+			renderMenu
+		Playing ->
+			renderGameArea world
+		GameOver -> renderGameOverScreen world
+		Won -> renderGameWon world
+-}
+
+renderMenu :: Picture
+renderMenu =
+	Pictures $
+	[ Color red $ Polygon $ rect (0,0) (1,1)
+	, Translate 0.1 0.5 $ Scale 0.0005 (-0.0005) $ Color green $ Text "press 's' to start"
+	]
 
 renderDbgText :: Vec Float -> (Vec Float, Vec Float) -> DebugInfo -> Picture
 renderDbgText wSize textArea dbgInfo =
@@ -65,33 +90,15 @@ renderDbgText wSize textArea dbgInfo =
 		textPos1 =
 			textPos0 |-| ((snd textArea) |*| wSize)
 
-renderGame :: World -> Picture
-renderGame world =
-	--Color red $ Polygon $ rect (0,0) (1,1)
-	case (world_uiState world) of
-		Menu ->
-			renderMenu
-		Playing ->
-			renderGameArea world
-		GameOver -> renderGameOverScreen world
-		Won -> renderGameWon world
-
-renderMenu :: Picture
-renderMenu =
-	Pictures $
-	[ Color red $ Polygon $ rect (0,0) (1,1)
-	, Translate 0.1 0.5 $ Scale 0.0005 (-0.0005) $ Color green $ Text "press 's' to start"
-	]
-
-renderGameOverScreen :: World -> Picture
-renderGameOverScreen world =
+renderGameOverScreen :: Picture
+renderGameOverScreen =
 	Pictures [
 		Color green $ Polygon $ rect (0,0) (1,1)
 	, Translate 0.1 0.5 $ Scale 0.0005 (-0.0005) $ Color red $ Text "GAME OVER! (to retry press 's')"
 	]
 
-renderGameWon :: World -> Picture
-renderGameWon world =
+renderGameWon :: Picture
+renderGameWon =
 	Pictures [
 		Color green $ Polygon $ rect (0,0) (1,1)
 	, Translate 0.1 0.5 $ Scale 0.0005 (-0.0005) $ Color red $ Text "You won, fucker!"

@@ -24,7 +24,9 @@ data WorldParams = WorldParams {
 	worldParams_level :: Int,
 	worldParams_size :: Size Int,
 	worldParams_wallRatio :: Float,
-	worldParams_ghostCount :: Int
+	worldParams_ghostCount :: Int,
+	worldParams_pacmanSpeed :: Float,
+	worldParams_ghostsSpeed :: Float
 }
 
 genWorld ::
@@ -57,14 +59,17 @@ genWorld'' rndGen WorldParams{..} =
 			allFreePositions \\ startPositions
 		return $
 			World {
-				world_uiState = Menu,
-				world_level = worldParams_level,
-				world_points = 0,
+				world_statistics =  Statistics {
+					world_level = worldParams_level,
+					world_points = 0
+				},
 				world_labyrinth = labyrinth,
 				world_pacman =
 					(defObj (vecMap fromIntegral pacmanPos)),
 				world_ghosts =
 					map (defGhost . vecMap fromIntegral) monsterPositions,
+				world_pacmanSpeed = worldParams_pacmanSpeed,
+				world_ghostSpeed = worldParams_ghostsSpeed,
 				world_dots =
 					map (set obj_size_l dotSize) $
 					map defObj $
