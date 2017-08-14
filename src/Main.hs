@@ -72,8 +72,7 @@ handleInput seed event state =
 						where
 							-- addDir dir = const [dir]
 							addDir dir =
-								take 2 . (dir:)
-								--(dir:) . (remDir $ opposite dir)
+								take 2 . (dir:) . (remDir $ opposite dir)
 								-- ([dir] `union`) . (remDir $ opposite dir)
 							remDir dir = filter (/=dir)
 			Menu -> case upOrDown of
