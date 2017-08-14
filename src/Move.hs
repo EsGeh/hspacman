@@ -19,6 +19,8 @@ moveWorld :: DeltaT -> World -> GameState
 moveWorld deltaT =
 	maybeEndGame
 	.
+	setDbgText 
+	.
 	movePacman deltaT
 	.
 	moveGhosts deltaT
@@ -32,6 +34,13 @@ moveWorld deltaT =
 					if isGameOver world
 					then GameOver $ world_statistics world
 					else Playing world
+		setDbgText world =
+			set world_dbgInfo_l (DbgInf dbgText) world
+			where
+				dbgText = concat $
+					[ "userInput: ", show $ world_userInput world, "\n"
+					, "pos: ", show (obj_pos $ world_pacman world), "\n"
+					]
 
 moveGhosts :: DeltaT -> World -> World
 moveGhosts dt world =
@@ -76,7 +85,6 @@ movePacman :: DeltaT -> World -> World
 movePacman dt world =
 	maybeEatDot $
 	fromMaybe world $
-	--traverseOf world_pacman_l `flip` world $ \pacman ->
 	do
 		primaryDir <- listToMaybe userInput :: Maybe Direction
 		if primaryDir `elem` possibleDirs
@@ -86,7 +94,7 @@ movePacman dt world =
 					secondaryDir <- listToMaybe $ tail userInput
 					if secondaryDir `elem` possibleDirs
 						then return $
-							-- over world_userInput_l tail $
+							--over world_userInput_l tail $
 							over world_pacman_l `flip` world $
 							moveObjSimple torusSize (normalizeDir $ directionToSpeed secondaryDir) (world_pacmanSpeed world * dt)
 						else
@@ -124,11 +132,6 @@ movePacman dt world =
 			normalizeDir $ directionsToSpeed $ world_userInput world
 		speed =
 			world_pacmanSpeed world
-		dbgText = concat $
-			[ "userInput: ", show $ world_userInput world, "\n"
-			, "pos: ", show (obj_pos $ world_pacman world), "\n"
-			, "dir: ", show dir, "\n"
-			]
 -}
 
 maybeEatDot world =

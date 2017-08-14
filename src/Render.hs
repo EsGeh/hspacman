@@ -16,10 +16,13 @@ render :: WindowSize -> GameState -> Picture
 render wSize state =
 	Pictures $
 	[
-		fitToArea (-1/2, -1/2) (vecX wSize, -vecY wSize) $
-		uncurry fitToArea gameArea $
-		renderGame state
-		-- renderDbgText wSize textArea (world_dbgInfo world)
+		renderGame
+			(renderDbgText wSize textArea . world_dbgInfo)
+			(
+				fitToArea (-1/2, -1/2) (vecX wSize, -vecY wSize) .
+				uncurry fitToArea gameArea
+			)
+			state
 	]
 	where
 		gameArea :: (Vec Float, Vec Float)
@@ -29,12 +32,16 @@ render wSize state =
 		textHeight :: Float
 		textHeight = 0.1
 
-renderGame :: GameState -> Picture
-renderGame = \case
-	Playing world -> renderGameArea world
-	Menu -> renderMenu
-	GameOver statistics -> renderGameOverScreen
-	Won statistics -> renderGameWon
+renderGame :: (World -> Picture) -> (Picture -> Picture) -> GameState -> Picture
+renderGame renderDbgTxt transformToGameArea = \case
+	Playing world ->
+		Pictures $
+		[ transformToGameArea $ renderGameArea world
+		, renderDbgTxt world
+		]
+	Menu -> transformToGameArea $ renderMenu
+	GameOver statistics -> transformToGameArea $ renderGameOverScreen
+	Won statistics -> transformToGameArea $ renderGameWon
 
 {-
 	case (world_uiState world) of
