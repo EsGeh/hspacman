@@ -66,10 +66,14 @@ randomTips =
 	, "If surwiving seems impossible, it might actually be."
 	, "Sometimes succeeding is just a sideeffect of not failing"
 	, "Sometimes failing is just a sideeffect of not succeeding"
-	, "A wall is always just a metaphor. That you are trapped. HAHAHAHAHA!"
+	, "A wall is always just a metaphor. That you are trapped."
 	, "The ghosts might not seem to have goals. But how do you know?"
-	, "For you still MISTER Pacman"
+	-- , "For you still MISTER Pacman"
 	, "If you think you cannot get there, try to turn to another direction."
+	, "Some people don't beleave in ghosts."
+	, "Every prison looks different."
+	, "A ghost appears as a cold blooded, spooky being. You can learn a lot from them."
+	, "The truth isn't euclidian"
 	]
 
 renderGame wSize world =
