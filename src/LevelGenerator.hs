@@ -29,6 +29,7 @@ data WorldParams = WorldParams {
 	worldParams_ghostsSpeed :: Float
 }
 
+{-
 genWorld ::
 	Int
 	-> WorldParams
@@ -44,9 +45,14 @@ genWorld' rndGen params =
 	let (world, newRndGen) =
 		runRand `flip` rndGen $ genWorld'' rndGen params
 	in set world_randomGen_l newRndGen world
+-}
 
-genWorld'' :: MonadRandom m => StdGen -> WorldParams -> m World
-genWorld'' rndGen WorldParams{..} =
+genWorld :: WorldParams -> State StdGen World
+genWorld =
+	withRandomGen . genWorld''
+
+genWorld'' :: MonadRandom m => WorldParams -> m World
+genWorld'' WorldParams{..} =
 	do
 		labyrinth <- genLabyrinth worldParams_size worldParams_wallRatio
 		let allFreePositions =
@@ -93,8 +99,8 @@ genWorld'' rndGen WorldParams{..} =
 				world_fruits= [],
 				world_dbgInfo = DbgInf{ info = "" },
 				world_userInput = [],
-				world_t = 0,
-				world_randomGen = rndGen
+				world_t = 0
+				--world_randomGen = rndGen
 			}
 	where
 		dotSize = (0.2, 0.2)

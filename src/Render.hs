@@ -7,6 +7,7 @@ import Vector2D
 import SGData.Matrix
 import qualified Data.Foldable as F -- enables folds over matrices
 import Data.Tuple
+import Control.Monad.Random
 
 import Graphics.Gloss hiding(display)
 
@@ -26,13 +27,19 @@ windowAreas = WindowAreas {
 		textHeight = 0.1 :: Float
 		statusHeight = 0.1 :: Float
 
-render :: Vec Float -> GameState -> Picture
+render :: MonadRandom m => Vec Float -> GameState -> m Picture
 render wSize = \case
 	Playing world ->
-		renderGame wSize world
-	Menu -> renderTextArea (-wSize |/ 2) wSize menuParams "hspacman\npress 's' to start"
-	GameOver statistics -> renderTextArea (-wSize |/ 2) wSize gameOverParams "GAME OVER!"
-	Won statistics -> renderTextArea (-wSize |/ 2) wSize wonParams "LEVEL ACCOMPLISHED.\nPress 's' to continue to next level"
+		return $ renderGame wSize world
+	Menu ->
+		do
+			tip <- uniform $ randomTips
+			return $ renderTextArea (-wSize |/ 2) wSize menuParams $ "hspacman\npress 's' to start\nTip: " ++ tip
+	GameOver statistics ->
+		uniform randomTips >>= \tip ->
+		return $ renderTextArea (-wSize |/ 2) wSize gameOverParams $ "GAME OVER!\nTip for the next time:\n" ++ tip
+	Won statistics ->
+		return $ renderTextArea (-wSize |/ 2) wSize wonParams "LEVEL ACCOMPLISHED.\nPress 's' to continue to next level"
 	where
 		menuParams = TextAreaParams {
 			textArea_fontSize = 0.4,
@@ -49,6 +56,21 @@ render wSize = \case
 			textArea_fontColor = green,
 			textArea_areaColor = blue
 		}
+
+randomTips :: [String]
+randomTips =
+	[ "Did you notice the ghosts movements are almost random? it's so spooky...!"
+	, "You can improve your strategy by not loosing!"
+	, "There may be situations you can not surwive..."
+	, "Stay away from the ghosts. They are dangerous!"
+	, "If surwiving seems impossible, it might actually be."
+	, "Sometimes succeeding is just a sideeffect of not failing"
+	, "Sometimes failing is just a sideeffect of not succeeding"
+	, "A wall is always just a metaphor. That you are trapped. HAHAHAHAHA!"
+	, "The ghosts might not seem to have goals. But how do you know?"
+	, "For you still MISTER Pacman"
+	, "If you think you cannot get there, try to turn to another direction."
+	]
 
 renderGame wSize world =
 	Pictures $
@@ -110,7 +132,17 @@ renderTextArea pos size TextAreaParams{..} text =
 		leftBorder = 0.1
 		textPositions = map ((*lineHeight)) [1..]
 		lineHeight = vecY size / (fromIntegral $ length textLines + 1)
-		textLines = reverse $ lines text
+		textLines =
+			reverse $
+			join $
+			map (splitLines 25) $ lines text
+
+splitLines :: Int -> [a] -> [[a]]
+splitLines len list =
+	if length list <= len then [list]
+	else
+		let (x, xs) = splitAt len list
+		in (x: splitLines len xs)
 
 renderGameArea :: World -> Picture
 renderGameArea world =

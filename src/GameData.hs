@@ -6,7 +6,9 @@ import SGData.Matrix
 
 import Prelude hiding(Left,Right)
 --import Control.Monad.Identity
-import System.Random( StdGen )
+-- import System.Random( StdGen )
+import Control.Monad.Random
+import Control.Monad.State
 import Lens
 import Lens.Micro.Platform
 
@@ -19,6 +21,21 @@ type Movement = Direction
 
 type Time = Float
 type DeltaT = Float
+
+withRandomGen ::
+	-- (forall m . MonadRandom m => m b)
+		Rand StdGen b
+	-> State StdGen b
+withRandomGen x =
+	do
+		rndGen <- get :: State StdGen StdGen
+		let (res, newState) = runRand x rndGen
+		put newState
+		return res
+	{-
+	state $ \rndGen ->
+	runRand `flip` rndGen x
+	-}
 
 
 opposite :: Direction -> Direction
@@ -45,6 +62,14 @@ orthogonal d = [ ret | ret<-allDirs, ret/=d, ret/=opposite d ]
 allDirs :: [Direction]
 allDirs = [Up,Down,Left,Right]
 
+{-
+data GameState
+	= GameState {
+		gameState_randomGen :: StdGen,
+		gameState_data :: GameData
+	}
+-}
+
 data GameState
 	= Playing World
 	| Menu
@@ -63,8 +88,8 @@ data World = World {
 	world_fruits :: [Fruit],
 	world_pacmanSpeed :: Float,
 	world_ghostSpeed :: Float,
-	world_dbgInfo :: DebugInfo,
-	world_randomGen :: StdGen
+	world_dbgInfo :: DebugInfo
+	-- world_randomGen :: StdGen
 }
 	-- deriving(Show)
 

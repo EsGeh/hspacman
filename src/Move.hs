@@ -1,5 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+-- {-# LANGUAGE Rank2Types #-}
 module Move where
 
 import GameData
@@ -11,19 +12,22 @@ import Prelude hiding(Left,Right)
 import Data.Tuple
 import Data.Maybe
 import Control.Monad.Random
+import Control.Monad.State
 
 import Lens.Micro.Platform
 
 
-moveWorld :: DeltaT -> World -> GameState
+moveWorld :: MonadRandom m => DeltaT -> World -> m GameState
 moveWorld deltaT =
-	maybeEndGame
+	fmap (
+		maybeEndGame
+		.
+		setDbgText 
+		.
+		movePacman deltaT
+	)
 	.
-	setDbgText 
-	.
-	movePacman deltaT
-	.
-	moveGhosts deltaT
+	(moveGhosts deltaT)
 	.
 	over world_t_l (+ deltaT)
 	where
@@ -42,13 +46,18 @@ moveWorld deltaT =
 					, "pos: ", show (obj_pos $ world_pacman world), "\n"
 					]
 
-moveGhosts :: DeltaT -> World -> World
-moveGhosts dt world =
+{-
+moveGhosts :: StdGen -> DeltaT -> World -> State World
+moveGhosts rndGen dt world =
 	let (newWorld, newRnd) =
 		runRand `flip` (world_randomGen world) $
 		traverseOf world_ghosts_l (mapM $ moveGhost world dt) world
 	in
 		newWorld{ world_randomGen = newRnd }
+-}
+
+moveGhosts :: forall m . MonadRandom m => DeltaT -> World -> m World
+moveGhosts dt world = traverseOf world_ghosts_l (mapM $ moveGhost world dt) world
 
 moveGhost :: forall m . MonadRandom m => World -> DeltaT -> Ghost -> m Ghost
 moveGhost world dt ghost =

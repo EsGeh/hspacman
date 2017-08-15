@@ -16,8 +16,10 @@ import Graphics.Gloss.Interface.Pure.Game hiding(Up,Down)
 import qualified Graphics.Gloss.Interface.Pure.Game as G
 
 import Control.Monad.Random
+import Control.Monad.State
 import Lens.Micro.Platform
 import Data.List
+import System.Random( getStdGen )
 
 
 windowTitle :: String
@@ -39,28 +41,30 @@ framerate = 40
 main :: IO ()
 main =
 	do
-		--let seed = 0
-		seed <- getRandom
+		startRandomGen <- getStdGen
 		play
 			display
 			bgColour
 			framerate
-			Menu
-			(Render.render windowSize) -- calls renderWorld from Module Renderpipeline
-			(handleInput seed)
-			move
+			(Menu, startRandomGen)
+			(\(st, rndGen) -> evalRand `flip` rndGen $ Render.render windowSize st)
+			(\event x -> runState `flip` (snd x) $ handleInput event $ fst x)
+			(\dt (st, rndGen) -> runState `flip` rndGen $ move dt st)
 
-move :: DeltaT -> GameState -> GameState
+move :: DeltaT -> GameState -> State StdGen GameState
 move dt = \case
-	Playing world -> Move.moveWorld dt world
-	x -> x
+	Playing world ->
+		withRandomGen $ Move.moveWorld dt world
+	x -> return $ x
 
-handleInput :: Int -> Event -> GameState -> GameState
-handleInput seed event state =
+type ActualState = (GameState, StdGen)
+
+handleInput :: Event -> GameState -> State StdGen GameState
+handleInput event state =
 	case event of
 		(EventKey key upOrDown _ _) -> case state of
 			Playing world ->
-				Playing $ over world_userInput_l `flip` world $
+				return $ Playing $ over world_userInput_l `flip` world $
 					case upOrDown of
 						G.Down -> case key of
 							Char 'w' -> addDir Up
@@ -78,20 +82,20 @@ handleInput seed event state =
 			Menu -> case upOrDown of
 				G.Down -> case key of
 					Char 's' ->
-						Playing $ LevelGenerator.genWorld seed $ worldParamsFromDifficulty 1
-					_ -> state
-				_ -> state
+						fmap Playing $ LevelGenerator.genWorld $ worldParamsFromDifficulty 1
+					_ -> return state
+				_ -> return state
 			GameOver statistics ->
 				case key of
 					Char 's' ->
-						Playing $ LevelGenerator.genWorld seed $ worldParamsFromDifficulty $ world_level statistics
-					_ -> state
+						fmap Playing $ LevelGenerator.genWorld $ worldParamsFromDifficulty $ world_level statistics
+					_ -> return state
 			Won statistics ->
 				case key of
 					Char 's' ->
-						Playing $ LevelGenerator.genWorld seed $ worldParamsFromDifficulty $ (+1) $ world_level statistics
-					_ -> state
-		_ -> state
+						fmap Playing $ LevelGenerator.genWorld $ worldParamsFromDifficulty $ (+1) $ world_level statistics
+					_ -> return state
+		_ -> return state
 
 worldParamsFromDifficulty :: Int -> LevelGenerator.WorldParams
 worldParamsFromDifficulty level =
@@ -106,7 +110,7 @@ worldParamsFromDifficulty level =
 	where
 		speed =
 			1.5 + (fromIntegral level) * 0.2
-		worldSize = level*2 + 10
+		worldSize = level*2 + 5
 		wallRatio = 0.6
 		ghostRatio = 1/60 :: Float
 
