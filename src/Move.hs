@@ -109,36 +109,13 @@ movePacman dt world =
 		labyrinth = world_labyrinth world
 		pacman = world_pacman world
 
-{-
-	let
-		newWorld =
-			(
-				maybeEatDot
-				.
-				set world_dbgInfo_l (DbgInf dbgText)
-				.
-				(over world_pacman_l $ moveObjInsideWalls (world_labyrinth world) dt dir speed)
-			) world
-	in
-		if isWon newWorld
-			then Won $ world_statistics newWorld
-			else
-				if isGameOver newWorld
-				then GameOver $ world_statistics newWorld
-				else Playing newWorld
-	where
-		dir :: Speed Float
-		dir =
-			normalizeDir $ directionsToSpeed $ world_userInput world
-		speed =
-			world_pacmanSpeed world
--}
-
+maybeEatDot :: World -> World
 maybeEatDot world =
 	let 
 		pacman_pos = obj_pos $ world_pacman world
 		pacman_size = obj_size $ world_pacman world
 	in
+		(\newWorld -> if world_dots world /= world_dots newWorld then over (world_statistics_l . world_points_l) (+1) newWorld else newWorld) $
 		over world_dots_l `flip` world $ filter $ \dot ->
 		not $ rectCollidesRect (pacman_pos, pacman_size) (obj_pos dot, obj_size dot)
 
@@ -164,7 +141,7 @@ moveObjInsideWallsMaybe labyrinth dt direction speed obj =
 	where
 		torusSize = (fromIntegral $ mGetWidth labyrinth, fromIntegral $ mGetHeight labyrinth)
 -}
-		
+
 moveObjSimple torusSize direction speed obj =
 	set obj_direction_l direction $
 	over obj_pos_l `flip` obj $ 

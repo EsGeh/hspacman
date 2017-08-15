@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 module Render where
 
 import GameData
@@ -10,106 +11,106 @@ import Data.Tuple
 import Graphics.Gloss hiding(display)
 
 
-type WindowSize = Vec Float
-
-render :: WindowSize -> GameState -> Picture
-render wSize state =
-	Pictures $
-	[
-		renderGame
-			(renderDbgText wSize textArea . world_dbgInfo)
-			(
-				fitToArea (-1/2, -1/2) (vecX wSize, -vecY wSize) .
-				uncurry fitToArea gameArea
-			)
-			state
-	]
-	where
+data WindowAreas =
+	WindowAreas {
+		textArea :: (Vec Float, Vec Float),
+		statusArea :: (Vec Float, Vec Float),
 		gameArea :: (Vec Float, Vec Float)
-		gameArea = ((0, textHeight), 1 |-| (0,textHeight))
-		textArea :: (Vec Float, Vec Float)
-		textArea = ((0,0), (1, textHeight))
-		textHeight :: Float
-		textHeight = 0.1
+	}
+windowAreas = WindowAreas {
+	textArea = ((0,1-textHeight), (1,textHeight)),
+	statusArea = ((0,0), (1,statusHeight)),
+	gameArea = ((0, statusHeight), (1,1 - textHeight - statusHeight))
+}
+	where
+		textHeight = 0.1 :: Float
+		statusHeight = 0.1 :: Float
 
-renderGame :: (World -> Picture) -> (Picture -> Picture) -> GameState -> Picture
-renderGame renderDbgTxt transformToGameArea = \case
+render :: Vec Float -> GameState -> Picture
+render wSize = \case
 	Playing world ->
-		Pictures $
-		[ transformToGameArea $ renderGameArea world
-		, renderDbgTxt world
-		]
-	Menu -> transformToGameArea $ renderMenu
-	GameOver statistics -> transformToGameArea $ renderGameOverScreen
-	Won statistics -> transformToGameArea $ renderGameWon
+		renderGame wSize world
+	Menu -> renderTextArea (-wSize |/ 2) wSize menuParams "hspacman\npress 's' to start"
+	GameOver statistics -> renderTextArea (-wSize |/ 2) wSize gameOverParams "GAME OVER!"
+	Won statistics -> renderTextArea (-wSize |/ 2) wSize wonParams "LEVEL ACCOMPLISHED.\nPress 's' to continue to next level"
+	where
+		menuParams = TextAreaParams {
+			textArea_fontSize = 0.4,
+			textArea_fontColor = red,
+			textArea_areaColor = green
+		}
+		gameOverParams = TextAreaParams {
+			textArea_fontSize = 0.4,
+			textArea_fontColor = green,
+			textArea_areaColor = red
+		}
+		wonParams = TextAreaParams {
+			textArea_fontSize = 0.4,
+			textArea_fontColor = green,
+			textArea_areaColor = blue
+		}
 
-{-
-	case (world_uiState world) of
-		Menu ->
-			renderMenu
-		Playing ->
-			renderGameArea world
-		GameOver -> renderGameOverScreen world
-		Won -> renderGameWon world
--}
-
-renderMenu :: Picture
-renderMenu =
-	Pictures $
-	[ Color red $ Polygon $ rect (0,0) (1,1)
-	, Translate 0.1 0.5 $ Scale 0.0005 (-0.0005) $ Color green $ Text "press 's' to start"
-	]
-
-renderDbgText :: Vec Float -> (Vec Float, Vec Float) -> DebugInfo -> Picture
-renderDbgText wSize textArea dbgInfo =
+renderGame wSize world =
 	Pictures $
 	[
-		Pictures $
-		adjustTextLines $
-		map (
-			Scale 0.08 0.08 .
-			Color white .
-			Text
-		) $
-			textLines
+	renderTextArea textPos textSize textParams $ info $ world_dbgInfo $ world
+	, renderTextArea statusPos statusSize statusParams $ statsToText $ world_statistics world
+	, fitToArea (-wSize |/2)  wSize $
+		fitToArea `uncurry` (gameArea windowAreas) $
+		fitToArea (0,1) (1,-1) $
+			renderGameArea world
 	]
 	where
-		adjustTextLines :: [Picture] -> [Picture]
-		adjustTextLines =
-			map adjust . ([0..] `zip`)
-			where
-				adjust :: (Int, Picture) -> Picture
-				adjust (index, textLine) =
-					Translate (fst textPos0) yPos textLine
-					where
-						yPos =
-							snd textPos0 +
-							lineHeight * (fromIntegral index)
-		lineHeight =
-			(/(fromIntegral $ length textLines)) $ (snd $ textPos1 |-| textPos0)
-		textLines = lines $ info dbgInfo
-		textPos0 :: Vec Float
-		textPos0 =
-			( (\x -> -x) $ (/2) $ fst wSize
-			, (/2) $ snd wSize
-			)
-		textPos1 :: Vec Float
-		textPos1 =
-			textPos0 |-| ((snd textArea) |*| wSize)
+		textPos =
+			(|-| (wSize |/2)) $
+			(|*| wSize) $
+			(fst $ textArea windowAreas)
+		textSize =
+			(|*| wSize) $
+			(snd $ textArea windowAreas)
+		statusPos =
+			(|-| (wSize |/2)) $
+			(|*| wSize) $
+			(fst $ statusArea windowAreas)
+		statusSize =
+			(|*| wSize) $
+			(snd $ statusArea windowAreas)
+		textParams = TextAreaParams {
+			textArea_fontSize = 0.2,
+			textArea_fontColor = white,
+			textArea_areaColor = black
+		}
+		statusParams = TextAreaParams {
+			textArea_fontSize = 0.2,
+			textArea_fontColor = blue,
+			textArea_areaColor = red
+		}
 
-renderGameOverScreen :: Picture
-renderGameOverScreen =
-	Pictures [
-		Color green $ Polygon $ rect (0,0) (1,1)
-	, Translate 0.1 0.5 $ Scale 0.0005 (-0.0005) $ Color red $ Text "GAME OVER! (to retry press 's')"
+statsToText Statistics{..} =
+	unlines . map concat $
+	[ [ "level: ", show world_level ]
+	, [ "points: ", show world_points ]
 	]
 
-renderGameWon :: Picture
-renderGameWon =
-	Pictures [
-		Color green $ Polygon $ rect (0,0) (1,1)
-	, Translate 0.1 0.5 $ Scale 0.0005 (-0.0005) $ Color red $ Text "You won, fucker!"
+data TextAreaParams = TextAreaParams {
+	textArea_fontSize :: Float,
+	textArea_fontColor :: Color,
+	textArea_areaColor :: Color
+}
+
+renderTextArea :: Vec Float -> Vec Float -> TextAreaParams -> String -> Picture
+renderTextArea pos size TextAreaParams{..} text =
+	Pictures $
+	[ fitToArea pos size $ Color textArea_areaColor $ Polygon $ rect (0,0) (1,1)
+	, Pictures $
+		map `flip` (textPositions `zip` textLines) $ \(textPos, textLine) ->
+			Translate `uncurry` (pos |+| (leftBorder* vecX size,textPos)) $ Scale textArea_fontSize textArea_fontSize $ Color textArea_fontColor $ Text textLine
 	]
+	where
+		leftBorder = 0.1
+		textPositions = map ((*lineHeight)) [1..]
+		lineHeight = vecY size / (fromIntegral $ length textLines + 1)
+		textLines = reverse $ lines text
 
 renderGameArea :: World -> Picture
 renderGameArea world =
@@ -194,6 +195,6 @@ renderLabyrinth cellSize lab =
 				posFromCoords coords = vecMap fromIntegral coords |*| cellSize
 
 fitToArea :: Vec Float -> Vec Float -> Picture -> Picture
-fitToArea (posX, posY) (width, height) =
-	Scale width height .
-	Translate posX posY
+fitToArea pos size =
+	uncurry Translate pos .
+	uncurry Scale size

@@ -100,7 +100,7 @@ data Object objState = Object {
 	obj_direction :: Speed Float,
 	--obj_t :: Time,
 	obj_state :: objState
-} deriving(Show)
+} deriving( Show, Eq, Ord )
 
 data GhostState = GhostState {
 	ghost_dir_history :: [(Direction, Float)]
@@ -127,6 +127,7 @@ defGhost pos =
 --data UIState = Playing | Menu | GameOver | Won deriving(Show)
 
 makeLensesWith lensRules' ''World
+makeLensesWith lensRules' ''Statistics
 makeLensesWith lensRules' ''Object
 makeLensesWith lensRules' ''GhostState
 
