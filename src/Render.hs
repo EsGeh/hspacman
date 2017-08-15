@@ -54,7 +54,7 @@ renderGame wSize world =
 	Pictures $
 	[
 	renderTextArea textPos textSize textParams $ info $ world_dbgInfo $ world
-	, renderTextArea statusPos statusSize statusParams $ statsToText $ world_statistics world
+	, renderTextArea statusPos statusSize statusParams $ statsToText $ world
 	, fitToArea (-wSize |/2)  wSize $
 		fitToArea `uncurry` (gameArea windowAreas) $
 		fitToArea (0,1) (1,-1) $
@@ -86,10 +86,10 @@ renderGame wSize world =
 			textArea_areaColor = red
 		}
 
-statsToText Statistics{..} =
+statsToText World{ world_statistics = Statistics{..}, ..} =
 	unlines . map concat $
 	[ [ "level: ", show world_level ]
-	, [ "points: ", show world_points ]
+	, [ "points: ", show world_points, " left: ", show $ length world_dots ]
 	]
 
 data TextAreaParams = TextAreaParams {

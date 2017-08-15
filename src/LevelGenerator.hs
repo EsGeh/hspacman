@@ -53,10 +53,24 @@ genWorld'' rndGen WorldParams{..} =
 			map swap $ 
 			filter ((==Free) . flip mGet labyrinth) $
 			mGetAllIndex labyrinth
+		pacmanPos <-
+			uniform $
+			allFreePositions
+		monsterPositions <-
+			randomSubSet (worldParams_ghostCount) $
+			filter ((>=3) . (distance $ vecMap fromIntegral $ pacmanPos) . vecMap fromIntegral) $
+			allFreePositions
+			
+		{-
+		let allFreePositions =
+			map swap $ 
+			filter ((==Free) . flip mGet labyrinth) $
+			mGetAllIndex labyrinth
 		startPositions@(pacmanPos : monsterPositions) <-
 			randomSubSet (worldParams_ghostCount + 1) $ allFreePositions
+		-}
 		let dotPositions =
-			allFreePositions \\ startPositions
+			allFreePositions \\ (pacmanPos : monsterPositions)
 		return $
 			World {
 				world_statistics =  Statistics {

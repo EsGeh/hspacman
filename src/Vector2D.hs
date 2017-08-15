@@ -34,6 +34,8 @@ rect pos (w,h) =
 	, pos
 	]
 
+distance :: Vec Float -> Vec Float -> Float
+distance p1 p2 = sqrt $ (vecX p1 - vecX p2)^^2 + (vecX p1 - vecX p2)^^2
 
 pointInSize :: Integral a => Size a -> Pos a -> Size a
 pointInSize (width,height) (x,y)  = (x `mod` width, y `mod` height)
