@@ -10,7 +10,12 @@ import Data.Tuple
 import Control.Monad.Random
 
 import Graphics.Gloss hiding(display)
+import Codec.BMP( BMP, bmpDimensions )
 
+
+data ImageResources = ImageResources {
+	imgRes_wallTile :: BMP
+}
 
 data WindowAreas =
 	WindowAreas {
@@ -27,19 +32,20 @@ windowAreas = WindowAreas {
 		textHeight = 0.1 :: Float
 		statusHeight = 0.1 :: Float
 
-render :: MonadRandom m => Vec Float -> GameState -> m Picture
-render wSize = \case
-	Playing world ->
-		return $ renderGame wSize world
-	Menu ->
-		do
-			tip <- uniform $ randomTips
-			return $ renderTextArea (-wSize |/ 2) wSize menuParams $ "hspacman\npress 's' to start\nTip: " ++ tip
-	GameOver statistics ->
-		uniform randomTips >>= \tip ->
-		return $ renderTextArea (-wSize |/ 2) wSize gameOverParams $ "GAME OVER!\nTip for the next time:\n" ++ tip
-	Won statistics ->
-		return $ renderTextArea (-wSize |/ 2) wSize wonParams "LEVEL ACCOMPLISHED.\nPress 's' to continue to next level"
+render :: MonadRandom m => ImageResources -> Vec Float -> GameState -> m Picture
+render imgResources wSize =
+	\case
+		Playing world ->
+			return $ renderGame imgResources wSize world
+		Menu ->
+			do
+				tip <- uniform $ randomTips
+				return $ renderTextArea (-wSize |/ 2) wSize menuParams $ "hspacman\npress 's' to start\nTip: " ++ tip
+		GameOver statistics ->
+			uniform randomTips >>= \tip ->
+			return $ renderTextArea (-wSize |/ 2) wSize gameOverParams $ "GAME OVER!\nTip for the next time:\n" ++ tip
+		Won statistics ->
+			return $ renderTextArea (-wSize |/ 2) wSize wonParams "LEVEL ACCOMPLISHED.\nPress 's' to continue to next level"
 	where
 		menuParams = TextAreaParams {
 			textArea_fontSize = 0.4,
@@ -76,15 +82,17 @@ randomTips =
 	, "The truth isn't euclidian"
 	]
 
-renderGame wSize world =
+renderGame imgResources wSize world =
 	Pictures $
 	[
-	renderTextArea textPos textSize textParams $ info $ world_dbgInfo $ world
-	, renderTextArea statusPos statusSize statusParams $ statsToText $ world
-	, fitToArea (-wSize |/2)  wSize $
-		fitToArea `uncurry` (gameArea windowAreas) $
-		fitToArea (0,1) (1,-1) $
-			renderGameArea world
+		renderTextArea textPos textSize textParams $ info $ world_dbgInfo $ world
+		,
+		renderTextArea statusPos statusSize statusParams $ statsToText $ world
+		,
+		fitToArea (-wSize |/2)  wSize $
+			fitToArea `uncurry` (gameArea windowAreas) $
+			fitToArea (0,1) (1,-1) $
+				renderGameArea imgResources world
 	]
 	where
 		textPos =
@@ -148,10 +156,10 @@ splitLines len list =
 		let (x, xs) = splitAt len list
 		in (x: splitLines len xs)
 
-renderGameArea :: World -> Picture
-renderGameArea world =
+renderGameArea :: ImageResources -> World -> Picture
+renderGameArea imgResources world =
 	Pictures [
-		renderLabyrinth cellSize lab,
+		renderLabyrinth (imgRes_wallTile imgResources) cellSize lab,
 		renderDots cellSize (world_dots world),
 		renderPacMan cellSize (world_t world) (world_pacman world),
 		renderGhosts cellSize (world_ghosts world)
@@ -212,8 +220,8 @@ renderChar cellSize object =
 	uncurry Translate (cellSize |*| obj_pos object) .
 	uncurry Scale (cellSize |*| obj_size object)
 
-renderLabyrinth :: Size Float -> Labyrinth -> Picture
-renderLabyrinth cellSize lab =
+renderLabyrinth :: BMP -> Size Float -> Labyrinth -> Picture
+renderLabyrinth wallTile cellSize lab =
 	--Color white $ Polygon $ rect (0,0) (1,1)
 	Pictures $
 		F.foldr (:) [] $ mapWithIndex drawCell lab
@@ -224,7 +232,13 @@ renderLabyrinth cellSize lab =
 		drawCell' coords0 ter =
 			case ter of
 				Free -> Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
-				Wall -> Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
+				Wall ->
+					Translate `uncurry` posCell $
+					Scale `uncurry` sizeCell $
+					Translate 0.5 0.5 $
+					(Scale `uncurry` (1 |/| (vecMap fromIntegral $ bmpDimensions wallTile))) $
+					bitmapOfBMP wallTile
+					-- Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
 			where
 				posCell = posFromCoords coords0
 				sizeCell= posFromCoords (coords0 |+| (1,1)) |-| posCell

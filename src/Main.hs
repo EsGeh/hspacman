@@ -1,9 +1,11 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 module Main where
 
-import GameData
+import GameData hiding( Left, Right )
+import qualified GameData as Dir ( Direction( Up, Down, Left, Right ) )
 import qualified LevelGenerator
 import qualified Render
 import qualified Move
@@ -19,8 +21,11 @@ import Control.Monad.Random
 import Control.Monad.State
 import Lens.Micro.Platform
 import Data.List
+import Data.Either
 import System.Random( getStdGen )
+import Codec.BMP( readBMP, BMP )
 
+imgPath = "res"
 
 windowTitle :: String
 windowTitle = "hsPacMan"
@@ -38,18 +43,28 @@ bgColour = black
 framerate :: Int
 framerate = 40
 
+
 main :: IO ()
 main =
 	do
 		startRandomGen <- getStdGen
+		imgResources <- loadImageResources
 		play
 			display
 			bgColour
 			framerate
 			(Menu, startRandomGen)
-			(\(st, rndGen) -> evalRand `flip` rndGen $ Render.render windowSize st)
+			(\(st, rndGen) -> evalRand `flip` rndGen $ Render.render imgResources windowSize st)
 			(\event x -> runState `flip` (snd x) $ handleInput event $ fst x)
 			(\dt (st, rndGen) -> runState `flip` rndGen $ move dt st)
+
+loadImageResources :: IO Render.ImageResources
+loadImageResources =
+	do
+		imgRes_wallTile <- fmap (either (error . show) id) $ readBMP $ imgPath ++ "/wall_tile.bmp"
+		return $ Render.ImageResources {
+			..
+		}
 
 move :: DeltaT -> GameState -> State StdGen GameState
 move dt = \case
@@ -69,8 +84,8 @@ handleInput event state =
 						G.Down -> case key of
 							Char 'w' -> addDir Up
 							Char 's' -> addDir Down
-							Char 'a' -> addDir Left
-							Char 'd' -> addDir Right
+							Char 'a' -> addDir Dir.Left
+							Char 'd' -> addDir Dir.Right
 							_ -> id
 						_ -> id
 						where

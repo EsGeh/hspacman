@@ -32,7 +32,8 @@ executable hspacman
     MonadRandom,
     mtl,
     transformers,
-    microlens-platform, template-haskell
+    microlens-platform, template-haskell,
+    bmp
   hs-source-dirs:      src
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -fno-warn-tabs -fprof-auto -fprof-cafs
   default-language:    Haskell2010
