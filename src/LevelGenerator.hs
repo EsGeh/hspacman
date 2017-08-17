@@ -14,7 +14,7 @@ import SGData.Matrix
 import Control.Monad.Random
 import Data.Maybe( fromJust )
 import Data.List
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Control.Monad.Trans.Maybe
 
 import Lens.Micro.Platform
@@ -47,12 +47,14 @@ genWorld' rndGen params =
 	in set world_randomGen_l newRndGen world
 -}
 
+{-
 genWorld :: WorldParams -> State StdGen World
 genWorld =
 	withRandomGen . genWorld''
+-}
 
-genWorld'' :: MonadRandom m => WorldParams -> m World
-genWorld'' WorldParams{..} =
+genWorld :: MonadRandom m => WorldParams -> m World
+genWorld WorldParams{..} =
 	do
 		labyrinth <- genLabyrinth worldParams_size worldParams_wallRatio
 		let allFreePositions =
@@ -122,6 +124,7 @@ genLabyrinth (width,height) wallRatio =
 	randomTunnels wallRatio <=< firstTunnel $
 	massiveField (width,height)
 
+firstTunnel :: MonadRandom m => Labyrinth -> m Labyrinth
 firstTunnel lab =
 	do
 		randomPos <-

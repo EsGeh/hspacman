@@ -23,6 +23,7 @@ normalize (x,y) =
 		lSafe = if l >= 0.0001 then l else 1
 		l = vec_length (x,y)
 
+vec_length :: Floating a => Vec a -> a
 vec_length (x,y) = sqrt $ x**2 + y**2
 
 rect :: Num a => Pos a -> Size a-> [Vec a]
@@ -35,7 +36,7 @@ rect pos (w,h) =
 	]
 
 distance :: Vec Float -> Vec Float -> Float
-distance p1 p2 = sqrt $ (vecX p1 - vecX p2)^^2 + (vecX p1 - vecX p2)^^2
+distance p1 p2 = sqrt $ (vecX p1 - vecX p2)^^(2 :: Int) + (vecX p1 - vecX p2)^^(2 :: Int)
 
 pointInSize :: Integral a => Size a -> Pos a -> Size a
 pointInSize (width,height) (x,y)  = (x `mod` width, y `mod` height)

@@ -5,10 +5,6 @@ import Vector2D
 import SGData.Matrix
 
 import Prelude hiding(Left,Right)
---import Control.Monad.Identity
--- import System.Random( StdGen )
-import Control.Monad.Random
-import Control.Monad.State
 import Lens
 import Lens.Micro.Platform
 
@@ -21,21 +17,6 @@ type Movement = Direction
 
 type Time = Float
 type DeltaT = Float
-
-withRandomGen ::
-	-- (forall m . MonadRandom m => m b)
-		Rand StdGen b
-	-> State StdGen b
-withRandomGen x =
-	do
-		rndGen <- get :: State StdGen StdGen
-		let (res, newState) = runRand x rndGen
-		put newState
-		return res
-	{-
-	state $ \rndGen ->
-	runRand `flip` rndGen x
-	-}
 
 
 opposite :: Direction -> Direction

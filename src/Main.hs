@@ -4,7 +4,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main where
 
-import GameData hiding( Left, Right )
+import GameData hiding( Up, Down, Left, Right )
 import qualified GameData as Dir ( Direction( Up, Down, Left, Right ) )
 import qualified LevelGenerator
 import qualified Render
@@ -18,13 +18,12 @@ import Graphics.Gloss.Interface.Pure.Game hiding(Up,Down)
 import qualified Graphics.Gloss.Interface.Pure.Game as G
 
 import Control.Monad.Random
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Lens.Micro.Platform
-import Data.List
-import Data.Either
 import System.Random( getStdGen )
-import Codec.BMP( readBMP, BMP )
+import Codec.BMP( readBMP )
 
+imgPath :: String
 imgPath = "res"
 
 windowTitle :: String
@@ -43,6 +42,7 @@ bgColour = black
 framerate :: Int
 framerate = 40
 
+type ActualState = (GameState, StdGen)
 
 main :: IO ()
 main =
@@ -58,10 +58,26 @@ main =
 			(\event x -> runState `flip` (snd x) $ handleInput event $ fst x)
 			(\dt (st, rndGen) -> runState `flip` rndGen $ move dt st)
 
+withRandomGen ::
+	-- (forall m . MonadRandom m => m b)
+		Rand StdGen b
+	-> State StdGen b
+withRandomGen x =
+	do
+		rndGen <- get :: State StdGen StdGen
+		let (res, newState) = runRand x rndGen
+		put newState
+		return res
+	{-
+	state $ \rndGen ->
+	runRand `flip` rndGen x
+	-}
+
 loadImageResources :: IO Render.ImageResources
 loadImageResources =
 	do
 		imgRes_wallTile <- fmap (either (error . show) id) $ readBMP $ imgPath ++ "/wall_tile.bmp"
+		imgRes_floorTile <- fmap (either (error . show) id) $ readBMP $ imgPath ++ "/floor_tile.bmp"
 		return $ Render.ImageResources {
 			..
 		}
@@ -72,18 +88,16 @@ move dt = \case
 		withRandomGen $ Move.moveWorld dt world
 	x -> return $ x
 
-type ActualState = (GameState, StdGen)
-
 handleInput :: Event -> GameState -> State StdGen GameState
-handleInput event state =
+handleInput event st =
 	case event of
-		(EventKey key upOrDown _ _) -> case state of
+		(EventKey key upOrDown _ _) -> case st of
 			Playing world ->
 				return $ Playing $ over world_userInput_l `flip` world $
 					case upOrDown of
 						G.Down -> case key of
-							Char 'w' -> addDir Up
-							Char 's' -> addDir Down
+							Char 'w' -> addDir Dir.Up
+							Char 's' -> addDir Dir.Down
 							Char 'a' -> addDir Dir.Left
 							Char 'd' -> addDir Dir.Right
 							_ -> id
@@ -97,20 +111,20 @@ handleInput event state =
 			Menu -> case upOrDown of
 				G.Down -> case key of
 					Char 's' ->
-						fmap Playing $ LevelGenerator.genWorld $ worldParamsFromDifficulty 1
-					_ -> return state
-				_ -> return state
+						fmap Playing $ withRandomGen $ LevelGenerator.genWorld $ worldParamsFromDifficulty 1
+					_ -> return st
+				_ -> return st
 			GameOver statistics ->
 				case key of
 					Char 's' ->
-						fmap Playing $ LevelGenerator.genWorld $ worldParamsFromDifficulty $ world_level statistics
-					_ -> return state
+						fmap Playing $ withRandomGen $ LevelGenerator.genWorld $ worldParamsFromDifficulty $ world_level statistics
+					_ -> return st
 			Won statistics ->
 				case key of
 					Char 's' ->
-						fmap Playing $ LevelGenerator.genWorld $ worldParamsFromDifficulty $ (+1) $ world_level statistics
-					_ -> return state
-		_ -> return state
+						fmap Playing $ withRandomGen $ LevelGenerator.genWorld $ worldParamsFromDifficulty $ (+1) $ world_level statistics
+					_ -> return st
+		_ -> return st
 
 worldParamsFromDifficulty :: Int -> LevelGenerator.WorldParams
 worldParamsFromDifficulty level =

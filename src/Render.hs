@@ -14,7 +14,8 @@ import Codec.BMP( BMP, bmpDimensions )
 
 
 data ImageResources = ImageResources {
-	imgRes_wallTile :: BMP
+	imgRes_wallTile :: BMP,
+	imgRes_floorTile :: BMP
 }
 
 data WindowAreas =
@@ -23,6 +24,8 @@ data WindowAreas =
 		statusArea :: (Vec Float, Vec Float),
 		gameArea :: (Vec Float, Vec Float)
 	}
+
+windowAreas :: WindowAreas
 windowAreas = WindowAreas {
 	textArea = ((0,1-textHeight), (1,textHeight)),
 	statusArea = ((0,0), (1,statusHeight)),
@@ -41,10 +44,10 @@ render imgResources wSize =
 			do
 				tip <- uniform $ randomTips
 				return $ renderTextArea (-wSize |/ 2) wSize menuParams $ "hspacman\npress 's' to start\nTip: " ++ tip
-		GameOver statistics ->
+		GameOver _ ->
 			uniform randomTips >>= \tip ->
 			return $ renderTextArea (-wSize |/ 2) wSize gameOverParams $ "GAME OVER!\nTip for the next time:\n" ++ tip
-		Won statistics ->
+		Won _ ->
 			return $ renderTextArea (-wSize |/ 2) wSize wonParams "LEVEL ACCOMPLISHED.\nPress 's' to continue to next level"
 	where
 		menuParams = TextAreaParams {
@@ -82,6 +85,7 @@ randomTips =
 	, "The truth isn't euclidian"
 	]
 
+renderGame :: ImageResources -> Vec Float -> World -> Picture
 renderGame imgResources wSize world =
 	Pictures $
 	[
@@ -120,6 +124,7 @@ renderGame imgResources wSize world =
 			textArea_areaColor = red
 		}
 
+statsToText :: World -> String
 statsToText World{ world_statistics = Statistics{..}, ..} =
 	unlines . map concat $
 	[ [ "level: ", show world_level ]
@@ -133,7 +138,7 @@ data TextAreaParams = TextAreaParams {
 }
 
 renderTextArea :: Vec Float -> Vec Float -> TextAreaParams -> String -> Picture
-renderTextArea pos size TextAreaParams{..} text =
+renderTextArea pos size TextAreaParams{..} string =
 	Pictures $
 	[ fitToArea pos size $ Color textArea_areaColor $ Polygon $ rect (0,0) (1,1)
 	, Pictures $
@@ -147,7 +152,8 @@ renderTextArea pos size TextAreaParams{..} text =
 		textLines =
 			reverse $
 			join $
-			map (splitLines 25) $ lines text
+			map (splitLines 25) $
+			lines string
 
 splitLines :: Int -> [a] -> [[a]]
 splitLines len list =
@@ -159,7 +165,7 @@ splitLines len list =
 renderGameArea :: ImageResources -> World -> Picture
 renderGameArea imgResources world =
 	Pictures [
-		renderLabyrinth (imgRes_wallTile imgResources) cellSize lab,
+		renderLabyrinth (imgRes_floorTile imgResources) (imgRes_wallTile imgResources) cellSize lab,
 		renderDots cellSize (world_dots world),
 		renderPacMan cellSize (world_t world) (world_pacman world),
 		renderGhosts cellSize (world_ghosts world)
@@ -220,8 +226,8 @@ renderChar cellSize object =
 	uncurry Translate (cellSize |*| obj_pos object) .
 	uncurry Scale (cellSize |*| obj_size object)
 
-renderLabyrinth :: BMP -> Size Float -> Labyrinth -> Picture
-renderLabyrinth wallTile cellSize lab =
+renderLabyrinth :: BMP -> BMP -> Size Float -> Labyrinth -> Picture
+renderLabyrinth floorTile wallTile cellSize lab =
 	--Color white $ Polygon $ rect (0,0) (1,1)
 	Pictures $
 		F.foldr (:) [] $ mapWithIndex drawCell lab
@@ -231,7 +237,13 @@ renderLabyrinth wallTile cellSize lab =
 		drawCell coords = drawCell' (swap coords)
 		drawCell' coords0 ter =
 			case ter of
-				Free -> Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
+				Free ->
+					Translate `uncurry` posCell $
+					Scale `uncurry` sizeCell $
+					Translate 0.5 0.5 $
+					(Scale `uncurry` (1 |/| (vecMap fromIntegral $ bmpDimensions wallTile))) $
+					bitmapOfBMP floorTile
+					-- Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
 				Wall ->
 					Translate `uncurry` posCell $
 					Scale `uncurry` sizeCell $

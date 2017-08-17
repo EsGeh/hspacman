@@ -1,9 +1,9 @@
 module Lens where
 
-import Data.Char
 import Lens.Micro.Platform
 import Language.Haskell.TH.Syntax
 
+lensRules' :: LensRules
 lensRules' =
 	lensRules & lensField .~ \_ _ field ->
 				[TopName $ mkName $ nameBase field ++ "_l"]

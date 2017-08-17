@@ -12,7 +12,6 @@ import Prelude hiding(Left,Right)
 import Data.Tuple
 import Data.Maybe
 import Control.Monad.Random
-import Control.Monad.State
 
 import Lens.Micro.Platform
 
@@ -116,7 +115,7 @@ movePacman dt world =
 			world_pacmanSpeed world
 		torusSize = (fromIntegral $ mGetWidth labyrinth, fromIntegral $ mGetHeight labyrinth)
 		labyrinth = world_labyrinth world
-		pacman = world_pacman world
+		-- pacman = world_pacman world
 
 maybeEatDot :: World -> World
 maybeEatDot world =
@@ -151,6 +150,7 @@ moveObjInsideWallsMaybe labyrinth dt direction speed obj =
 		torusSize = (fromIntegral $ mGetWidth labyrinth, fromIntegral $ mGetHeight labyrinth)
 -}
 
+moveObjSimple :: Size Float -> Speed Float -> Float -> Object st -> Object st
 moveObjSimple torusSize direction speed obj =
 	set obj_direction_l direction $
 	over obj_pos_l `flip` obj $ 
