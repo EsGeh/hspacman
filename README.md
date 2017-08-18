@@ -10,6 +10,7 @@ Haskell implementation of the classical Namco Pacman Game
 ### prerequisites
 
 install git
+install stack[](https://docs.haskellstack.org)
 
 ### clone the repository
 
