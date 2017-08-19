@@ -142,7 +142,7 @@ worldParamsFromDifficulty :: Int -> LevelGenerator.WorldParams
 worldParamsFromDifficulty level =
 	LevelGenerator.WorldParams{
 		LevelGenerator.worldParams_level = level,
-		LevelGenerator.worldParams_size = (worldSize, worldSize),
+		LevelGenerator.worldParams_size = (floor $ fromIntegral worldSize*3/2, worldSize),
 		LevelGenerator.worldParams_wallRatio = wallRatio,
 		LevelGenerator.worldParams_ghostCount = floor $ ghostRatio * (fromIntegral $ worldSize*worldSize),
 		LevelGenerator.worldParams_pacmanSpeed = speed,

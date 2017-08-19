@@ -24,6 +24,7 @@ data ImageResources = ImageResources {
 	imgRes_font :: BitmapFont
 }
 
+{-
 data WindowAreas =
 	WindowAreas {
 		textArea :: (Vec Float, Vec Float),
@@ -40,6 +41,7 @@ windowAreas = WindowAreas {
 	where
 		textHeight = 0.1 :: Float
 		statusHeight = 0.1 :: Float
+-}
 
 render :: MonadRandom m => ImageResources -> Vec Float -> GameState -> m Picture
 render imgResources wSize =
@@ -89,30 +91,34 @@ randomTips =
 	, "The truth isn't euclidean"
 	]
 
+fitToFrame :: Size Float -> Size Float -> Float
+fitToFrame size frame =
+	uncurry min $ (frame |/| size)
+
 renderGame :: ImageResources -> Vec Float -> World -> Picture
 renderGame imgResources wSize world =
+	Translate (- vecX wSize /2) (- vecY wSize / 2) $ -- moves the origin to left bottom corner
 	Pictures $
 	[
-		{-
-		Translate `uncurry` textPos $
-		renderTextArea (textAreaParams white) $ info $ world_dbgInfo $ world
+		Translate `uncurry` gameAreaPos $
+		Scale `uncurry` ((\x -> (x,x)) $ gameAreaScaleFactor) $
+		renderGameArea imgResources world
 		,
-		-}
 		Translate `uncurry` statusPos $
 		renderTextArea (textAreaParams blue) $ statsToText world
-		,
-		{-
-		renderTextArea textPos textSize textParams $ info $ world_dbgInfo $ world
-		,
-		renderTextArea statusPos statusSize statusParams $ statsToText $ world
-		,
-		-}
-		fitToArea (-wSize |/2)  wSize $
-			fitToArea `uncurry` (gameArea windowAreas) $
-			fitToArea (0,1) (1,-1) $
-				renderGameArea imgResources world
 	]
 	where
+		gameAreaPos = (0,0) |+| ((gameAreaSize |-| gameAreaActualSize) |/2)
+		gameAreaScaleFactor = fitToFrame labyrinthSize gameAreaSize
+		gameAreaActualSize = labyrinthSize |* gameAreaScaleFactor
+		labyrinthSize =
+			labyrinthSizeOnScreen $ world_labyrinth world
+		statusPos = (0, gameAreaHeight)
+		statusSize = (vecX wSize, statusHeight)
+		gameAreaSize = (vecX wSize, gameAreaHeight)
+		gameAreaHeight = vecY wSize - statusHeight
+		statusHeight = 100
+		{-
 		textPos =
 			(|-| (wSize |/2)) $
 			(|*| wSize) $
@@ -127,10 +133,11 @@ renderGame imgResources wSize world =
 		statusSize =
 			(|*| wSize) $
 			(snd $ statusArea windowAreas)
+		-}
 		textAreaParams color = TextAreaParams {
 			textArea_bmpFont = (imgRes_font imgResources),
 			textArea_textParams = TextFieldParams {
-				textFieldParams_size = textSize,
+				textFieldParams_size = statusSize,
 				textFieldParams_fontSize = 32
 			},
 			textArea_backgroundColor = color
@@ -143,32 +150,40 @@ statsToText World{ world_statistics = Statistics{..}, ..} =
 	, [ "points: ", show world_points, " left: ", show $ length world_dots ]
 	]
 
-
+-- (0,0).. (labyrinthSizeOnScreen (world_labyrinth world))
 renderGameArea :: ImageResources -> World -> Picture
 renderGameArea imgResources world =
+	Scale 1 (-1) $
+	Translate 0 (- vecY labyrinthSize) $
 	Pictures [
-		renderLabyrinth (imgRes_floorTile imgResources) (imgRes_wallTile imgResources) cellSize lab,
-		renderDots cellSize (world_dots world),
-		renderPacMan cellSize (world_t world) (world_pacman world),
-		renderGhosts cellSize (world_ghosts world)
+		renderLabyrinth (imgRes_floorTile imgResources) (imgRes_wallTile imgResources) (world_labyrinth world)
+		,
+		renderDots (world_dots world)
+		,
+		renderGhosts (world_ghosts world)
+		,
+		renderPacMan (world_t world) $ (world_pacman world)
 	]
 	where
-		cellSize :: Size Float
-		cellSize = (1,1) |/| (fromIntegral $ mGetWidth lab, fromIntegral $ mGetHeight lab)
-		lab = world_labyrinth world 
+		labyrinthSize = labyrinthSizeOnScreen $ world_labyrinth world
 
-renderDots :: Size Float -> [Dot] -> Picture
-renderDots cellSize dots =
-	Pictures $ map renderDot dots
+renderDots :: [Dot] -> Picture
+renderDots =
+	Pictures . map renderDot
 	where
 		renderDot dot =
-			renderFigure cellSize dot $
+			placeObject dot $
 			Color black $
 			ThickCircle (1/4) (1/2)
 
-renderPacMan :: Size Float -> Time -> Pacman -> Picture
-renderPacMan cellSize time pacman =
-	renderFigure cellSize pacman $
+placeObject :: Object st -> Picture -> Picture
+placeObject object =
+	uncurry Translate (obj_pos object) .
+	uncurry Scale (obj_size object)
+
+renderPacMan :: Time -> Pacman -> Picture
+renderPacMan time pacman =
+	placeObject pacman $
 	Translate (1/2) (1/2) $
 	Rotate rotateAngle $
 	Color yellow $
@@ -192,52 +207,39 @@ renderPacMan cellSize time pacman =
 				_ -> 0
 				--angle -> error $ "got " ++ show angle
 
-renderGhosts :: Size Float -> [Ghost] -> Picture
-renderGhosts cellSize =
-	Pictures . map (renderGhost cellSize)
+renderGhosts :: [Ghost] -> Picture
+renderGhosts =
+	Pictures . map renderGhost
 
-renderGhost :: Size Float -> Ghost -> Picture
-renderGhost cellSize ghost =
-	renderFigure cellSize ghost $
+renderGhost :: Ghost -> Picture
+renderGhost ghost =
+	placeObject ghost $
 	Color green $
 	Polygon $ [(1/2,0), (1,1), (0,1) ]
-	-- (Polygon $ rect (0,0) (1,1))
 
-renderFigure :: Size Float -> Object st -> Picture -> Picture
-renderFigure cellSize object =
-	uncurry Translate (cellSize |*| obj_pos object) .
-	uncurry Scale (cellSize |*| obj_size object)
-
-renderLabyrinth :: Picture -> Picture -> Size Float -> Labyrinth -> Picture
-renderLabyrinth floorTile@(Bitmap floorWidth floorHeight _ _) wallTile@(Bitmap wallWidth wallHeight _ _) cellSize lab =
+-- (0,0).. (labyrinthSizeOnScreen (world_labyrinth world))
+renderLabyrinth :: Picture -> Picture -> Labyrinth -> Picture
+renderLabyrinth floorTile wallTile lab =
 	Pictures $
-		F.foldr (:) [] $ mapWithIndex drawCell lab
-	where
-        -- in order to display the matrix correctly the lines/columns have to be flipped when drawing
-		drawCell :: MatrIndex -> Territory -> Picture
-		drawCell coords = drawCell' (swap coords)
-		drawCell' coords0 ter =
-			case ter of
-				Free ->
-					Translate `uncurry` posCell $
-					Scale `uncurry` sizeCell $
-					Translate 0.5 0.5 $
-					Scale `uncurry` (1 |/| (vecMap fromIntegral $ (floorWidth, floorHeight))) $
-					floorTile
-					--bitmapOfBMP floorTile
-					-- Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
-				Wall ->
-					Translate `uncurry` posCell $
-					Scale `uncurry` sizeCell $
-					Translate 0.5 0.5 $
-					Scale `uncurry` (1 |/| (vecMap fromIntegral $ (wallWidth, wallHeight))) $
-					wallTile
-					--bitmapOfBMP wallTile
-					-- Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
-			where
-				posCell = posFromCoords coords0
-				sizeCell= posFromCoords (coords0 |+| (1,1)) |-| posCell
-				posFromCoords coords = vecMap fromIntegral coords |*| cellSize
+		F.foldr (:) [] $ mapWithIndex `flip` lab $ \index territory ->
+			Translate `uncurry` (vecMap fromI $ swap index) $
+			drawCell floorTile wallTile territory
+
+labyrinthSizeOnScreen labyrinth = swap $ vecMap fromI $ mGetSize $ labyrinth
+
+-- (0,0) .. (1,1)
+drawCell :: Picture -> Picture -> Territory -> Picture
+drawCell floorTile@(Bitmap floorWidth floorHeight _ _) wallTile@(Bitmap wallWidth wallHeight _ _) =
+	Translate 0.5 0.5 .
+	\case
+		Free ->
+			Scale `uncurry` (1 |/| (vecMap fromIntegral $ (floorWidth, floorHeight))) $
+			floorTile
+			-- Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
+		Wall ->
+			Scale `uncurry` (1 |/| (vecMap fromIntegral $ (wallWidth, wallHeight))) $
+			wallTile
+			-- Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
 
 fitToArea :: Vec Float -> Vec Float -> Picture -> Picture
 fitToArea pos size =
