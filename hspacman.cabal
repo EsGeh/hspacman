@@ -14,19 +14,17 @@ cabal-version:       >=1.10
 
 executable hspacman
   main-is:             Main.hs
-  --exposed-modules:       
   other-modules:       
     GameData,
     LevelGenerator,
     RandomUtils,
-    Render,
+    Render, Render.Text,
     Vector2D,
     Move,
     Lens
-  -- other-modules:       
   build-depends:
     base == 4.9.*,
-    gloss,
+    gloss == 1.11.1.1,
     sgData,
     random,
     MonadRandom,

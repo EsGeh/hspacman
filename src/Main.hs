@@ -21,7 +21,8 @@ import Control.Monad.Random
 import Control.Monad.State.Strict
 import Lens.Micro.Platform
 import System.Random( getStdGen )
-import Codec.BMP( readBMP )
+import qualified Codec.BMP as BMP
+-- import Codec.BMP( readBMP )
 
 imgPath :: String
 imgPath = "res"
@@ -49,6 +50,7 @@ main =
 	do
 		startRandomGen <- getStdGen
 		imgResources <- loadImageResources
+		--return ()
 		play
 			display
 			bgColour
@@ -76,8 +78,18 @@ withRandomGen x =
 loadImageResources :: IO Render.ImageResources
 loadImageResources =
 	do
-		imgRes_wallTile <- fmap (either (error . show) id) $ readBMP $ imgPath ++ "/wall_tile.bmp"
-		imgRes_floorTile <- fmap (either (error . show) id) $ readBMP $ imgPath ++ "/floor_tile.bmp"
+		imgRes_wallTile <- loadBMP $ imgPath ++ "/wall_tile.bmp"
+		imgRes_floorTile <- loadBMP $ imgPath ++ "/floor_tile.bmp"
+		fontBMP <-
+			fmap (either (error . ("bmp error: "++) . show) id ) $ BMP.readBMP $ imgPath ++ "/outline_24x32.bmp"
+		putStrLn $ ("font info: " ++) . show $ BMP.bmpFileHeader fontBMP
+		putStrLn $ ("font info: " ++) . show $ BMP.bmpBitmapInfo fontBMP
+		let fontImg = bitmapDataOfBMP fontBMP
+		let imgRes_font = Render.BitmapFont {
+			Render.bmpFont_bmp = fontImg,
+			Render.bmpFont_charWidth = 24,
+			Render.bmpFont_size = BMP.bmpDimensions fontBMP
+			}
 		return $ Render.ImageResources {
 			..
 		}

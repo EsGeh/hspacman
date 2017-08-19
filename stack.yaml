@@ -43,6 +43,12 @@ packages:
 - location:
    git: https://github.com/EsGeh/sgCard.git
    commit: 27f5f86d9551e7c02beae42a4be0ae5e6908d3b2
+- location:
+   git: https://github.com/EsGeh/gloss.git
+   commit: 72bdafb0ad49511627cb9ea387e112ca4ab8966f
+  subdirs:
+   - gloss
+   - gloss-rendering
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)

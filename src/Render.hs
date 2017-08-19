@@ -1,12 +1,17 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
-module Render where
+module Render(
+	module Render,
+	module Render.Text
+) where
 
+import Render.Text
 import GameData
 import Vector2D
 import SGData.Matrix
 import qualified Data.Foldable as F -- enables folds over matrices
 import Data.Tuple
+import Data.Maybe
 import Control.Monad.Random
 
 import Graphics.Gloss hiding(display)
@@ -14,8 +19,9 @@ import Codec.BMP( BMP, bmpDimensions )
 
 
 data ImageResources = ImageResources {
-	imgRes_wallTile :: BMP,
-	imgRes_floorTile :: BMP
+	imgRes_wallTile :: Picture,
+	imgRes_floorTile :: Picture,
+	imgRes_font :: BitmapFont
 }
 
 data WindowAreas =
@@ -27,8 +33,8 @@ data WindowAreas =
 
 windowAreas :: WindowAreas
 windowAreas = WindowAreas {
-	textArea = ((0,1-textHeight), (1,textHeight)),
-	statusArea = ((0,0), (1,statusHeight)),
+	statusArea = ((0,1-textHeight), (1,textHeight)),
+	textArea = ((0,0), (1,statusHeight)),
 	gameArea = ((0, statusHeight), (1,1 - textHeight - statusHeight))
 }
 	where
@@ -43,27 +49,26 @@ render imgResources wSize =
 		Menu ->
 			do
 				tip <- uniform $ randomTips
-				return $ renderTextArea (-wSize |/ 2) wSize menuParams $ "hspacman\npress 's' to start\nTip: " ++ tip
+				return $ Translate (-vecX wSize / 2) (-vecY wSize / 2) $
+					renderTextArea (textAreaParams green) $
+					"hspacman\n\npress 's' to start\n\n\nTip:\n" ++ tip
 		GameOver _ ->
 			uniform randomTips >>= \tip ->
-			return $ renderTextArea (-wSize |/ 2) wSize gameOverParams $ "GAME OVER!\nTip for the next time:\n" ++ tip
+				return $ Translate (-vecX wSize / 2) (-vecY wSize / 2) $
+					renderTextArea (textAreaParams red) $
+					"GAME OVER!\n\n\nTip for the next time:\n" ++ tip
 		Won _ ->
-			return $ renderTextArea (-wSize |/ 2) wSize wonParams "LEVEL ACCOMPLISHED.\nPress 's' to continue to next level"
+			return $ Translate (-vecX wSize / 2) (-vecY wSize / 2) $
+				renderTextArea (textAreaParams red) $
+				"LEVEL ACCOMPLISHED.\n\nPress 's' to continue to next level"
 	where
-		menuParams = TextAreaParams {
-			textArea_fontSize = 0.4,
-			textArea_fontColor = red,
-			textArea_areaColor = green
-		}
-		gameOverParams = TextAreaParams {
-			textArea_fontSize = 0.4,
-			textArea_fontColor = green,
-			textArea_areaColor = red
-		}
-		wonParams = TextAreaParams {
-			textArea_fontSize = 0.4,
-			textArea_fontColor = green,
-			textArea_areaColor = blue
+		textAreaParams color = TextAreaParams {
+			textArea_bmpFont = (imgRes_font imgResources),
+			textArea_textParams = TextFieldParams {
+				textFieldParams_size = wSize,
+				textFieldParams_fontSize = 32
+			},
+			textArea_backgroundColor = color
 		}
 
 randomTips :: [String]
@@ -89,10 +94,20 @@ renderGame :: ImageResources -> Vec Float -> World -> Picture
 renderGame imgResources wSize world =
 	Pictures $
 	[
+		{-
+		Translate `uncurry` textPos $
+		renderTextArea (textAreaParams white) $ info $ world_dbgInfo $ world
+		,
+		-}
+		Translate `uncurry` statusPos $
+		renderTextArea (textAreaParams blue) $ statsToText world
+		,
+		{-
 		renderTextArea textPos textSize textParams $ info $ world_dbgInfo $ world
 		,
 		renderTextArea statusPos statusSize statusParams $ statsToText $ world
 		,
+		-}
 		fitToArea (-wSize |/2)  wSize $
 			fitToArea `uncurry` (gameArea windowAreas) $
 			fitToArea (0,1) (1,-1) $
@@ -113,15 +128,13 @@ renderGame imgResources wSize world =
 		statusSize =
 			(|*| wSize) $
 			(snd $ statusArea windowAreas)
-		textParams = TextAreaParams {
-			textArea_fontSize = 0.2,
-			textArea_fontColor = white,
-			textArea_areaColor = black
-		}
-		statusParams = TextAreaParams {
-			textArea_fontSize = 0.2,
-			textArea_fontColor = blue,
-			textArea_areaColor = red
+		textAreaParams color = TextAreaParams {
+			textArea_bmpFont = (imgRes_font imgResources),
+			textArea_textParams = TextFieldParams {
+				textFieldParams_size = textSize,
+				textFieldParams_fontSize = 32
+			},
+			textArea_backgroundColor = color
 		}
 
 statsToText :: World -> String
@@ -131,36 +144,6 @@ statsToText World{ world_statistics = Statistics{..}, ..} =
 	, [ "points: ", show world_points, " left: ", show $ length world_dots ]
 	]
 
-data TextAreaParams = TextAreaParams {
-	textArea_fontSize :: Float,
-	textArea_fontColor :: Color,
-	textArea_areaColor :: Color
-}
-
-renderTextArea :: Vec Float -> Vec Float -> TextAreaParams -> String -> Picture
-renderTextArea pos size TextAreaParams{..} string =
-	Pictures $
-	[ fitToArea pos size $ Color textArea_areaColor $ Polygon $ rect (0,0) (1,1)
-	, Pictures $
-		map `flip` (textPositions `zip` textLines) $ \(textPos, textLine) ->
-			Translate `uncurry` (pos |+| (leftBorder* vecX size,textPos)) $ Scale textArea_fontSize textArea_fontSize $ Color textArea_fontColor $ Text textLine
-	]
-	where
-		leftBorder = 0.1
-		textPositions = map ((*lineHeight)) [1..]
-		lineHeight = vecY size / (fromIntegral $ length textLines + 1)
-		textLines =
-			reverse $
-			join $
-			map (splitLines 25) $
-			lines string
-
-splitLines :: Int -> [a] -> [[a]]
-splitLines len list =
-	if length list <= len then [list]
-	else
-		let (x, xs) = splitAt len list
-		in (x: splitLines len xs)
 
 renderGameArea :: ImageResources -> World -> Picture
 renderGameArea imgResources world =
@@ -180,13 +163,13 @@ renderDots cellSize dots =
 	Pictures $ map renderDot dots
 	where
 		renderDot dot =
-			renderChar cellSize dot $
+			renderFigure cellSize dot $
 			Color black $
 			ThickCircle (1/4) (1/2)
 
 renderPacMan :: Size Float -> Time -> Pacman -> Picture
 renderPacMan cellSize time pacman =
-	renderChar cellSize pacman $
+	renderFigure cellSize pacman $
 	Translate (1/2) (1/2) $
 	Rotate rotateAngle $
 	Color yellow $
@@ -216,19 +199,18 @@ renderGhosts cellSize =
 
 renderGhost :: Size Float -> Ghost -> Picture
 renderGhost cellSize ghost =
-	renderChar cellSize ghost $
+	renderFigure cellSize ghost $
 	Color green $
 	Polygon $ [(1/2,0), (1,1), (0,1) ]
 	-- (Polygon $ rect (0,0) (1,1))
 
-renderChar :: Size Float -> Object st -> Picture -> Picture
-renderChar cellSize object =
+renderFigure :: Size Float -> Object st -> Picture -> Picture
+renderFigure cellSize object =
 	uncurry Translate (cellSize |*| obj_pos object) .
 	uncurry Scale (cellSize |*| obj_size object)
 
-renderLabyrinth :: BMP -> BMP -> Size Float -> Labyrinth -> Picture
-renderLabyrinth floorTile wallTile cellSize lab =
-	--Color white $ Polygon $ rect (0,0) (1,1)
+renderLabyrinth :: Picture -> Picture -> Size Float -> Labyrinth -> Picture
+renderLabyrinth floorTile@(Bitmap floorWidth floorHeight _ _) wallTile@(Bitmap wallWidth wallHeight _ _) cellSize lab =
 	Pictures $
 		F.foldr (:) [] $ mapWithIndex drawCell lab
 	where
@@ -241,15 +223,17 @@ renderLabyrinth floorTile wallTile cellSize lab =
 					Translate `uncurry` posCell $
 					Scale `uncurry` sizeCell $
 					Translate 0.5 0.5 $
-					(Scale `uncurry` (1 |/| (vecMap fromIntegral $ bmpDimensions wallTile))) $
-					bitmapOfBMP floorTile
+					Scale `uncurry` (1 |/| (vecMap fromIntegral $ (floorWidth, floorHeight))) $
+					floorTile
+					--bitmapOfBMP floorTile
 					-- Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
 				Wall ->
 					Translate `uncurry` posCell $
 					Scale `uncurry` sizeCell $
 					Translate 0.5 0.5 $
-					(Scale `uncurry` (1 |/| (vecMap fromIntegral $ bmpDimensions wallTile))) $
-					bitmapOfBMP wallTile
+					Scale `uncurry` (1 |/| (vecMap fromIntegral $ (wallWidth, wallHeight))) $
+					wallTile
+					--bitmapOfBMP wallTile
 					-- Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
 			where
 				posCell = posFromCoords coords0
