@@ -24,25 +24,6 @@ data ImageResources = ImageResources {
 	imgRes_font :: BitmapFont
 }
 
-{-
-data WindowAreas =
-	WindowAreas {
-		textArea :: (Vec Float, Vec Float),
-		statusArea :: (Vec Float, Vec Float),
-		gameArea :: (Vec Float, Vec Float)
-	}
-
-windowAreas :: WindowAreas
-windowAreas = WindowAreas {
-	statusArea = ((0,1-textHeight), (1,textHeight)),
-	textArea = ((0,0), (1,statusHeight)),
-	gameArea = ((0, statusHeight), (1,1 - textHeight - statusHeight))
-}
-	where
-		textHeight = 0.1 :: Float
-		statusHeight = 0.1 :: Float
--}
-
 render :: MonadRandom m => ImageResources -> Vec Float -> GameState -> m Picture
 render imgResources wSize =
 	\case
@@ -118,22 +99,6 @@ renderGame imgResources wSize world =
 		gameAreaSize = (vecX wSize, gameAreaHeight)
 		gameAreaHeight = vecY wSize - statusHeight
 		statusHeight = 100
-		{-
-		textPos =
-			(|-| (wSize |/2)) $
-			(|*| wSize) $
-			(fst $ textArea windowAreas)
-		textSize =
-			(|*| wSize) $
-			(snd $ textArea windowAreas)
-		statusPos =
-			(|-| (wSize |/2)) $
-			(|*| wSize) $
-			(fst $ statusArea windowAreas)
-		statusSize =
-			(|*| wSize) $
-			(snd $ statusArea windowAreas)
-		-}
 		textAreaParams color = TextAreaParams {
 			textArea_bmpFont = (imgRes_font imgResources),
 			textArea_textParams = TextFieldParams {
