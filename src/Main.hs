@@ -41,7 +41,7 @@ bgColour :: Color
 bgColour = black
 
 framerate :: Int
-framerate = 40
+framerate = 60
 
 type ActualState = (GameState, StdGen)
 
@@ -122,18 +122,18 @@ handleInput event st =
 							remDir dir = filter (/=dir)
 			Menu -> case upOrDown of
 				G.Down -> case key of
-					Char 's' ->
+					SpecialKey KeySpace ->
 						fmap Playing $ withRandomGen $ LevelGenerator.genWorld $ worldParamsFromDifficulty 1
 					_ -> return st
 				_ -> return st
 			GameOver statistics ->
 				case key of
-					Char 's' ->
+					SpecialKey KeySpace ->
 						fmap Playing $ withRandomGen $ LevelGenerator.genWorld $ worldParamsFromDifficulty $ world_level statistics
 					_ -> return st
 			Won statistics ->
 				case key of
-					Char 's' ->
+					SpecialKey KeySpace ->
 						fmap Playing $ withRandomGen $ LevelGenerator.genWorld $ worldParamsFromDifficulty $ (+1) $ world_level statistics
 					_ -> return st
 		_ -> return st

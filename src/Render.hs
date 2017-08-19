@@ -34,16 +34,23 @@ render imgResources wSize =
 				tip <- uniform $ randomTips
 				return $ Translate (-vecX wSize / 2) (-vecY wSize / 2) $
 					renderTextArea (textAreaParams green) $
-					"hspacman\n\npress 's' to start\n\n\nTip:\n" ++ tip
+					concat $
+					[ "hspacman\n\n"
+					, "keys:\n"
+					, keyInfo, "\n\n"
+					, "press Space to start...\n\n\n"
+					, "Tip:\n"
+					, tip
+					]
 		GameOver _ ->
 			uniform randomTips >>= \tip ->
 				return $ Translate (-vecX wSize / 2) (-vecY wSize / 2) $
 					renderTextArea (textAreaParams red) $
-					"GAME OVER!\n\n\nTip for the next time:\n" ++ tip
+					"GAME OVER!\n\npress Space to retry the level\n\n\nTip for the next time:\n" ++ tip
 		Won _ ->
 			return $ Translate (-vecX wSize / 2) (-vecY wSize / 2) $
 				renderTextArea (textAreaParams red) $
-				"LEVEL ACCOMPLISHED.\n\nPress 's' to continue to next level"
+				"LEVEL ACCOMPLISHED.\n\nPress Space to continue to next level"
 	where
 		textAreaParams color = TextAreaParams {
 			textArea_bmpFont = (imgRes_font imgResources),
@@ -54,11 +61,13 @@ render imgResources wSize =
 			textArea_backgroundColor = color
 		}
 
+keyInfo = "w: up\na: left\ns: down\nd: right\nEsc: quit"
+
 randomTips :: [String]
 randomTips =
 	[ "Did you notice the ghosts movements are almost random? it's so spooky...!"
 	, "You can improve your strategy by not loosing!"
-	, "There may be situations you can not surwive..."
+	, "There might be situations you can not surwive..."
 	, "Stay away from the ghosts. They are dangerous!"
 	, "If surwiving seems impossible, it might actually be."
 	, "Sometimes succeeding is just a sideeffect of not failing"
@@ -68,8 +77,9 @@ randomTips =
 	, "If you think you cannot get there, try to turn to another direction."
 	, "Some people don't beleave in ghosts."
 	, "Every prison looks different."
-	, "A ghost appears as a cold blooded, spooky being. You can learn a lot from them."
+	, "A ghost appears as a cold blooded, unemotionaL being. You can learn a lot from them."
 	, "The truth isn't euclidean"
+	, "First of all Pacman is a game that challenges the intellect"
 	]
 
 fitToFrame :: Size Float -> Size Float -> Float
