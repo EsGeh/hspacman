@@ -80,6 +80,7 @@ loadImageResources =
 	do
 		imgRes_wallTile <- loadBMP $ imgPath ++ "/wall_tile.bmp"
 		imgRes_floorTile <- loadBMP $ imgPath ++ "/floor_tile.bmp"
+		imgRes_ghost <- loadBMP $ imgPath ++ "/ghost.bmp"
 		fontBMP <-
 			fmap (either (error . ("bmp error: "++) . show) id ) $ BMP.readBMP $ imgPath ++ "/outline_24x32.bmp"
 		putStrLn $ ("font info: " ++) . show $ BMP.bmpFileHeader fontBMP
@@ -139,12 +140,14 @@ handleInput event st =
 		_ -> return st
 
 worldParamsFromDifficulty :: Int -> LevelGenerator.WorldParams
+--worldParamsFromDifficulty :: Monad m => Int -> m LevelGenerator.WorldParams
 worldParamsFromDifficulty level =
 	LevelGenerator.WorldParams{
 		LevelGenerator.worldParams_level = level,
 		LevelGenerator.worldParams_size = (floor $ fromIntegral worldSize*3/2, worldSize),
 		LevelGenerator.worldParams_wallRatio = wallRatio,
-		LevelGenerator.worldParams_ghostCount = floor $ ghostRatio * (fromIntegral $ worldSize*worldSize),
+		LevelGenerator.worldParams_ghostCount =
+			floor $ ghostRatio * (fromIntegral $ worldSize*worldSize),
 		LevelGenerator.worldParams_pacmanSpeed = speed,
 		LevelGenerator.worldParams_ghostsSpeed = speed * 0.9
 	}

@@ -21,6 +21,7 @@ import Codec.BMP( BMP, bmpDimensions )
 data ImageResources = ImageResources {
 	imgRes_wallTile :: Picture,
 	imgRes_floorTile :: Picture,
+	imgRes_ghost :: Picture,
 	imgRes_font :: BitmapFont
 }
 
@@ -135,7 +136,7 @@ renderGameArea imgResources world =
 		,
 		renderDots (world_dots world)
 		,
-		renderGhosts (world_ghosts world)
+		renderGhosts (imgRes_ghost imgResources) (world_ghosts world)
 		,
 		renderPacMan (world_t world) $ (world_pacman world)
 	]
@@ -182,15 +183,22 @@ renderPacMan time pacman =
 				_ -> 0
 				--angle -> error $ "got " ++ show angle
 
-renderGhosts :: [Ghost] -> Picture
-renderGhosts =
-	Pictures . map renderGhost
+renderGhosts :: Picture -> [Ghost] -> Picture
+renderGhosts ghostPic =
+	Pictures . map (renderGhost ghostPic)
 
-renderGhost :: Ghost -> Picture
-renderGhost ghost =
+renderGhost :: Picture -> Ghost -> Picture
+renderGhost ghostPic@(Bitmap ghostWidth ghostHeight _ _) ghost =
 	placeObject ghost $
-	Color green $
-	Polygon $ [(1/2,0), (1,1), (0,1) ]
+	-- Color green $
+	Translate 0.5 0.5 $
+	--Scale `uncurry` (1 |/| (vecMap fromIntegral $ (ghostWidth, ghostHeight))) $
+	Scale scaleFac scaleFac $
+	Scale 1 (-1) $
+	ghostPic
+	--Polygon $ [(1/2,0), (1,1), (0,1) ]
+	where
+		scaleFac = (1/) $ fromIntegral $ max ghostWidth ghostHeight
 
 -- (0,0).. (labyrinthSizeOnScreen (world_labyrinth world))
 renderLabyrinth :: Picture -> Picture -> Labyrinth -> Picture
