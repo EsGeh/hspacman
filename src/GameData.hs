@@ -43,14 +43,6 @@ orthogonal d = [ ret | ret<-allDirs, ret/=d, ret/=opposite d ]
 allDirs :: [Direction]
 allDirs = [Up,Down,Left,Right]
 
-{-
-data GameState
-	= GameState {
-		gameState_randomGen :: StdGen,
-		gameState_data :: GameData
-	}
--}
-
 data GameState
 	= Playing World
 	| Menu
@@ -161,3 +153,15 @@ speedToDirection speed =
 			_ -> error "internal error"
 	in
 		xDir ++ yDir
+
+class ToText a where
+	toText :: a -> String
+
+instance (Show a) => ToText (Matrix a) where
+	toText = showMatr
+
+showMatr :: Show a => Matrix a -> String
+showMatr =
+	unlines .
+	map (foldl (\x y -> x ++ "|" ++ y) "" . map show) .
+	mGetAllRows

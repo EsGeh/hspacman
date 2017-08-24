@@ -1,4 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 module LevelGenerator(
 	WorldParams(..),
 	genWorld
@@ -6,57 +8,34 @@ module LevelGenerator(
 
 import GameData --hiding(Direction)
 import Vector2D
-import RandomUtils
 import Prelude hiding(Left,Right)
 import Data.Tuple
 
 import SGData.Matrix
 import Control.Monad.Random
-import Data.Maybe( fromJust )
+import Data.Maybe( fromMaybe )
 import Data.List
-import Control.Monad.State.Strict
-import Control.Monad.Trans.Maybe
 
 import Lens.Micro.Platform
+
+import Debug.Trace
 
 
 data WorldParams = WorldParams {
 	worldParams_level :: Int,
 	worldParams_size :: Size Int,
-	worldParams_wallRatio :: Float,
+	worldParams_gridStep :: Size Int,
+	--worldParams_wallRatio :: Float,
 	worldParams_ghostCount :: Int,
 	worldParams_pacmanSpeed :: Float,
 	worldParams_ghostsSpeed :: Float
 }
-
-{-
-genWorld ::
-	Int
-	-> WorldParams
-	-> World
-genWorld seed params =
-	genWorld' (mkStdGen seed) params
-
-genWorld' ::
-	StdGen
-	-> WorldParams
-	-> World
-genWorld' rndGen params =
-	let (world, newRndGen) =
-		runRand `flip` rndGen $ genWorld'' rndGen params
-	in set world_randomGen_l newRndGen world
--}
-
-{-
-genWorld :: WorldParams -> State StdGen World
-genWorld =
-	withRandomGen . genWorld''
--}
+	deriving( Show, Read, Ord, Eq)
 
 genWorld :: MonadRandom m => WorldParams -> m World
 genWorld WorldParams{..} =
 	do
-		labyrinth <- genLabyrinth worldParams_size worldParams_wallRatio
+		labyrinth <- genLabyrinth worldParams_size worldParams_gridStep
 		let allFreePositions =
 			map swap $ 
 			filter ((==Free) . flip mGet labyrinth) $
@@ -65,18 +44,9 @@ genWorld WorldParams{..} =
 			uniform $
 			allFreePositions
 		monsterPositions <-
-			randomSubSet (worldParams_ghostCount) $
+			randomSubSet worldParams_ghostCount $
 			filter ((>=3) . (distance $ vecMap fromIntegral $ pacmanPos) . vecMap fromIntegral) $
 			allFreePositions
-			
-		{-
-		let allFreePositions =
-			map swap $ 
-			filter ((==Free) . flip mGet labyrinth) $
-			mGetAllIndex labyrinth
-		startPositions@(pacmanPos : monsterPositions) <-
-			randomSubSet (worldParams_ghostCount + 1) $ allFreePositions
-		-}
 		let dotPositions =
 			allFreePositions \\ (pacmanPos : monsterPositions)
 		return $
@@ -115,151 +85,196 @@ randomSubSet count list
 			x <- uniform list
 			fmap (x :) $ randomSubSet (count-1) (list\\[x])
 
--- create a labyrinth by spawning worms on a field that is massive in the beginning:
 genLabyrinth ::
+	forall m .
 	MonadRandom m =>
-	Size Int -> Float
+	Size Int -> Size Int
 	-> m Labyrinth
-genLabyrinth (width,height) wallRatio = 
-	randomTunnels wallRatio <=< firstTunnel $
-	massiveField (width,height)
-
-firstTunnel :: MonadRandom m => Labyrinth -> m Labyrinth
-firstTunnel lab =
+genLabyrinth labSize gridStep = 
 	do
-		randomPos <-
-			uniform $
-			map swap $ 
-			-- filter ((==Wall) . flip mGet lab) $
-			mGetAllIndex lab
-		let oneStepLeft = movePoint (width,height) randomPos (directionToSpeed Left)
-		boreTunnel (wormBehaviourFirst Left 1) oneStepLeft Left
-			=<<
-			boreTunnel (wormBehaviourFirst Right 1) randomPos Right lab
+		let positions =
+			fmap (|+| (vecMap (`div` 2) gridStep)) $
+			subGrid gridStep (labSize |-| gridStep)
+			:: Grid (Pos Int)
+		traceM $ "grid:\n" ++ toText positions
+		connections <-
+			randomDelEdgesWhile edgeDelCondition $
+			allEdgesOfGrid labSize positions
+			:: m [Edge]
+		traceM $ "connections:\n" ++ show connections
+		allPaths <-
+			fmap (map $ pointInSize labSize) $
+			fmap join $
+			mapM (uncurry connectionRoute) connections :: m [Pos Int]
+		return $
+			foldl (.) id (map `flip` allPaths $ \pos -> mSet pos Free) $
+			massiveField labSize
 	where
-		(width,height) = (mGetWidth lab, mGetHeight lab)
+		edgeDelCondition :: [Edge] -> Edge -> Bool
+		edgeDelCondition allEdges (p1, p2) =
+			length (edgesFromPos labSize p1 allEdges) > 3 && length (edgesFromPos labSize p2 allEdges) > 3
+
+type Edge = (Pos Int, Pos Int)
+
+randomDelEdgesWhile :: MonadRandom m => ([Edge] -> Edge -> Bool) -> [Edge] -> m [Edge]
+randomDelEdgesWhile cond edges =
+	do
+		mNewGraph <- randomDeleteEdge cond edges
+		case mNewGraph of
+			Nothing -> return $ edges
+			Just x -> randomDelEdgesWhile cond x
+
+randomDeleteEdge :: MonadRandom m => ([Edge] -> Edge -> Bool) -> [Edge] -> m (Maybe [Edge])
+randomDeleteEdge cond edges =
+	let possibleEdges = filter (cond edges) edges
+	in 
+		case possibleEdges of
+			[] -> return Nothing
+			_ ->
+				do
+					edgeToDel <- uniform possibleEdges
+					return $ Just $ edges \\ [edgeToDel]
+
+edgesFromPos :: Size Int -> Pos Int -> [Edge] -> [Edge]
+edgesFromPos size =
+	(\pos -> filter $ \edge -> pointInSize size (fst edge) == pos || pointInSize size (snd edge) == pos)
+	.
+	(pointInSize size)
+
+-- an edge over the border of the torus is represented by one node in
+-- (|+|) <$> [(vecX size,0), (0,vecY size), size] <*> [0..(size-1)]
+allEdgesOfGrid :: Size Int -> Grid (Pos Int) -> [(Pos Int, Pos Int)]
+allEdgesOfGrid size grid =
+	nub $
+	foldl (++) [] $
+	mapWithIndex `flip` grid  $ \index pos ->
+	do
+		neighbour <- lookupIndex <$> neighbourIndices' index :: [Pos Int]
+		return $ 
+			if pos < neighbour then (pos, neighbour) else (neighbour, pos)
+	where
+		lookupIndex index =
+			let
+				normalizedIndex = pointInSize (mGetSize grid) index
+			in
+				(if vecY normalizedIndex < vecY index then (|+| (0,vecY size)) else id) $
+				(if vecX normalizedIndex < vecX index then (|+| (vecX size,0)) else id) $
+				(mGet `flip` grid) $
+				normalizedIndex
+		neighbourIndices' point =
+			filter (\x -> vecX x >= 0 && vecY x >= 0) $
+			neighbourIndices point
+
+type Grid a = Matrix a
+
+neighbourIndices :: Pos Int -> [Pos Int]
+neighbourIndices point =
+	do
+		movement <- [(0,), (,0) ] <*> [1, (-1)]
+		return $
+			point |+| movement
+
+subGrid :: Vec Int  -> Size Int -> Grid (Vec Int)
+subGrid (stepX, stepY) size =
+	fromMaybe (error "internal error") $ mFromListRow rows
+	where
+		rows :: [[Vec Int]]
+		rows =
+			do
+				x <- [0,stepX..vecX size-1]
+				return $ do
+					y <- [0,stepY..vecY size-1]
+					return $ (x,y)
 
 -- a field with wall on all cells 
 massiveField :: Size Int -> Labyrinth
 massiveField (width,height) =
-	fromJust $ mFromListRow $ replicate height line
+	fromMaybe (error "internal error") $ mFromListRow $ replicate height line
 	where
 		line = replicate width Wall :: [Territory]
 
--- bore tunnels until the wall ratio has been reached:
-randomTunnels :: (MonadRandom m) => Float -> Labyrinth -> m Labyrinth
-randomTunnels wallRatio lab =
-	if currentWallRatio <= wallRatio
-	then return lab
-	else randomTunnels wallRatio =<< randomTunnelsStep lab
+connectionRoute :: MonadRandom m => Vec Int -> Vec Int -> m [Vec Int]
+connectionRoute l r =
+	return $
+	lineRaster start stop
+	`union`
+	if (abs $ lineGradient start stop) <= 1
+		then init $ lineRaster (start |+| (1,0)) (stop |+| (1,0))
+		else init $ lineRaster (start |+| (0,1)) (stop |+| (0,1))
 	where
-		currentWallRatio = (fromIntegral countWall) / (fromIntegral $ width*height)
-		countWall = sum $ fmap fromEnum lab
-		(width,height) = (mGetWidth lab, mGetHeight lab)
+		(start, stop) = (vecMap fromI l, vecMap fromI r)
 
-randomTunnelsStep :: MonadRandom m => Labyrinth -> m Labyrinth
-randomTunnelsStep lab =
-	do
-		randomPos <-
-			uniform $
-			map swap $ 
-			filter ((==Wall) . flip mGet lab) $
-			mGetAllIndex lab
-		let oneStepLeft = movePoint (width,height) randomPos (directionToSpeed Left)
-		boreTunnel (wormBehaviour Left 0.5) oneStepLeft Left
-			=<<
-			boreTunnel (wormBehaviour Right 0.5) randomPos Right lab
+lineRaster :: Vec Float -> Vec Float -> [Vec Int]
+lineRaster start stop =
+	(if swapCoords then map swap else id) $
+		lineRaster' l r
 	where
-		(width,height) = (mGetWidth lab, mGetHeight lab)
+		swapCoords = not $ abs (lineGradient start stop) <= 1
+		(l, r) =
+			(\(l', r') -> if vecX l' > vecX r' then (r',l') else (l',r')) $
+			(if swapCoords then \(l', r') -> (swap l', swap r') else id) $
+			(start, stop)
 
-boreTunnel ::
-	MonadRandom m =>
-	WormBehaviour m
-	-> Pos Int
-	-> Direction
-	-> Labyrinth
-	-> m Labyrinth
-boreTunnel wormBeh pos0 favDir matr =
-	evalStateT `flip`
-		WormStatus{
-			lastDir = favDir,
-			history = [pos0]
-		} $
-		runWorm (wormStep wormBeh) $
-		mSet (swap pos0) Free matr
+-- | precondition: abs lineGradient <= 1
+lineRaster' :: Vec Float -> Vec Float -> [Vec Int]
+lineRaster' start stop =
+	--trace ("start, stop: " ++ show (start,stop)) $
+	let
+		(rowDiff, colDiff) =
+				stop |-| start
+			:: Vec Float
+		rowVals =
+			[(vecX start)..(vecX stop)]
+ 			:: [Float]
+	in 
+		--trace ("rowVals " ++ show rowVals) $
+		--trace ("diff " ++ show (rowDiff, colDiff)) $
+		map `flip` rowVals $ \row ->
+			-- trace ("row " ++ show row) $
+			let
+				colLeft = (row - vecX start) * colDiff / rowDiff + (vecY start) :: Float
+			in
+				(floor row, floor colLeft)
 
--- runs a worm until its "dead" ( = returns "Nothing"):
-runWorm :: Monad m => (Labyrinth -> MaybeT m Labyrinth) -> Labyrinth -> m Labyrinth
-runWorm worm lab =
-	runMaybeT (worm lab) >>= \mNewLabyrinth ->
-	case mNewLabyrinth of
-		Nothing -> return $ lab
-		Just newLab -> runWorm worm $ newLab
+lineGradient :: Vec Float -> Vec Float -> Float
+lineGradient start stop =
+	let
+		(xDiff, yDiff) =
+				stop |-| start
+			:: Vec Float
+	in
+		yDiff / xDiff
 
-data WormStatus = WormStatus {
-	lastDir :: Direction,
-	history :: [Pos Int]
-	-- pos :: Pos Int
-}
-
-type WormBehaviour m =
-	WormStatus -> Labyrinth -> m (Maybe Direction)
-
-wormStep ::
-	MonadRandom m =>
-	WormBehaviour m
-	-> Labyrinth
-	-> MaybeT (StateT WormStatus m) Labyrinth
-wormStep wormBeh matr =
-	get >>= \wormStatus ->
-	do
-		newDir <- MaybeT $ lift $ wormBeh wormStatus matr
-		(oldPos: _)  <- gets history
-		let newPos = movePoint (mGetWidth matr, mGetHeight matr) oldPos . directionToSpeed $ newDir
-		put $ WormStatus{
-			lastDir = newDir,
-			history = newPos : (history wormStatus)
-			-- pos = newPos
-		}
-		return $
-			mSet (swap newPos) Free matr
-
-wormBehaviourFirst ::
-	MonadRandom m =>
-	Direction -> Rational
-	-> WormBehaviour m
-wormBehaviourFirst favDir prop WormStatus{..} matr =
-	do
-		rndDir <- randomDirS (favDir:(orthogonal favDir)) [(favDir, prop)]
-		return $
-			if
-				(mGet (swap forwardPos) matr)/=Free &&
-				(mGet (swap leftPos) matr)/=Free &&
-				(mGet (swap rightPos) matr)/=Free 
-			then Just $ rndDir
-			else Nothing
+{-
+randomNonEmptyPartition :: MonadRandom m => Int -> [a] -> m [[a]]
+randomNonEmptyPartition count l =
+	foldl (>=>) return (map addToRandomPartition l) $
+	replicate count []
 	where
-		[forwardPos, leftPos, rightPos] =
-			map (movePoint (mGetWidth matr, mGetHeight matr) (head $ history) . directionToSpeed) $
-				[lastDir, leftOf lastDir, rightOf lastDir]
+		addToRandomPartition :: MonadRandom m => a -> [[a]] -> m [[a]]
+		addToRandomPartition x partition =
+			do
+				selectedPartition <- uniform [0..(length partition-1)]
+				return $ changeListElem (x:) selectedPartition partition
+-}
 
-wormBehaviour ::
-	MonadRandom m =>
-	Direction -> Rational
-	-> WormBehaviour m
-wormBehaviour favDir prop WormStatus{..} matr =
-	do
-		rndDir <- randomDirS (favDir:(orthogonal favDir)) [(favDir, prop)]
-		return $
-			if
-				or $
-				[ mGet (swap forwardPos) matr == Free && not (forwardPos `elem` history)
-				, mGet (swap leftPos) matr == Free && not (leftPos `elem` history)
-				, mGet (swap rightPos) matr == Free && not (rightPos `elem` history)
-				]
-			then Nothing
-			else Just $ rndDir
+{-
+randomPartition :: MonadRandom m => Int -> [a] -> m [[a]]
+randomPartition count l =
+	foldl (>=>) return (map addToRandomPartition l) $
+	replicate count []
 	where
-		[forwardPos, leftPos, rightPos] =
-			map (movePoint (mGetWidth matr, mGetHeight matr) (head $ history) . directionToSpeed) $
-				[lastDir, leftOf lastDir, rightOf lastDir]
+		addToRandomPartition :: MonadRandom m => a -> [[a]] -> m [[a]]
+		addToRandomPartition x partition =
+			do
+				selectedPartition <- uniform [0..(length partition-1)]
+				return $ changeListElem (x:) selectedPartition partition
+
+changeListElem :: (a -> a) -> Int -> [a] -> [a]
+changeListElem f index (x:xs)
+	| index == 0 	= (f x):xs
+	| otherwise 	= x:(changeListElem f (index-1) xs)
+-}
+
+fromI :: (Integral i, Num a) => i -> a
+fromI = fromIntegral

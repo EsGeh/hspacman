@@ -144,8 +144,12 @@ worldParamsFromDifficulty :: Int -> LevelGenerator.WorldParams
 worldParamsFromDifficulty level =
 	LevelGenerator.WorldParams{
 		LevelGenerator.worldParams_level = level,
-		LevelGenerator.worldParams_size = (floor $ fromIntegral worldSize*3/2, worldSize),
-		LevelGenerator.worldParams_wallRatio = wallRatio,
+		LevelGenerator.worldParams_size =
+			(worldSize, worldSize),
+			--(floor $ fromIntegral worldSize*3/2, worldSize),
+		LevelGenerator.worldParams_gridStep =
+			(3,3),
+		--LevelGenerator.worldParams_wallRatio = wallRatio,
 		LevelGenerator.worldParams_ghostCount =
 			floor $ ghostRatio * (fromIntegral $ worldSize*worldSize),
 		LevelGenerator.worldParams_pacmanSpeed = speed,
@@ -155,7 +159,6 @@ worldParamsFromDifficulty level =
 		speed =
 			1.5 + (fromIntegral level) * 0.2
 		worldSize = level*2 + 5
-		wallRatio = 0.6
 		ghostRatio = 1/60 :: Float
 
 -- |changes the moving direction of the pacman
