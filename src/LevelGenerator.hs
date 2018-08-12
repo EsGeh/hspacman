@@ -94,7 +94,7 @@ genLabyrinth labSize gridStep =
 	do
 		let positions =
 			fmap (|+| (vecMap (`div` 2) gridStep)) $
-			subGrid gridStep (labSize |-| gridStep)
+			mkGrid gridStep (labSize |-| gridStep)
 			:: Grid (Pos Int)
 		traceM $ "grid:\n" ++ toText positions
 		connections <-
@@ -174,8 +174,8 @@ neighbourIndices point =
 		return $
 			point |+| movement
 
-subGrid :: Vec Int  -> Size Int -> Grid (Vec Int)
-subGrid (stepX, stepY) size =
+mkGrid :: Vec Int  -> Size Int -> Grid (Vec Int)
+mkGrid (stepX, stepY) size =
 	fromMaybe (error "internal error") $ mFromListRow rows
 	where
 		rows :: [[Vec Int]]
