@@ -60,6 +60,7 @@ renderText bmpFont textFieldParams@TextFieldParams{..} str =
 		fontScale = textFieldParams_fontSize / (fromI lineHeight)
 
 -- | renderTextLine bmpFont textFieldParams str renders str to (0,0)..(charWidth * (length str), snd bmpFont_size)
+renderTextLine :: BitmapFont -> TextFieldParams -> String -> Picture
 renderTextLine bmpFont TextFieldParams{..} str =
 	Pictures $
 	zipWith positionChars
@@ -68,7 +69,7 @@ renderTextLine bmpFont TextFieldParams{..} str =
 		positionChars :: Int -> Picture -> Picture
 		positionChars index =
 			Translate (fromIntegral $ index * bmpFont_charWidth bmpFont) 0
-		(width, height) = bmpFont_size bmpFont
+		-- (width, height) = bmpFont_size bmpFont
 
 -- | renders a single char to (0,0)..(charWidth, snd bmpFont_size)
 renderChar :: BitmapFont -> Char -> Picture

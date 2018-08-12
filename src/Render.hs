@@ -11,16 +11,16 @@ import Vector2D
 import SGData.Matrix
 import qualified Data.Foldable as F -- enables folds over matrices
 import Data.Tuple
-import Data.Maybe
 import Control.Monad.Random
 
 import Graphics.Gloss hiding(display)
-import Codec.BMP( BMP, bmpDimensions )
+--import Codec.BMP( BMP, bmpDimensions )
 
 
 data ImageResources = ImageResources {
 	imgRes_wallTile :: Picture,
 	imgRes_floorTile :: Picture,
+	imgRes_ghost :: Picture,
 	imgRes_font :: BitmapFont
 }
 
@@ -52,15 +52,16 @@ render imgResources wSize =
 				renderTextArea (textAreaParams red) $
 				"LEVEL ACCOMPLISHED.\n\nPress Space to continue to next level"
 	where
-		textAreaParams color = TextAreaParams {
+		textAreaParams bgColour = TextAreaParams {
 			textArea_bmpFont = (imgRes_font imgResources),
 			textArea_textParams = TextFieldParams {
 				textFieldParams_size = wSize,
 				textFieldParams_fontSize = 32
 			},
-			textArea_backgroundColor = color
+			textArea_backgroundColor = bgColour
 		}
 
+keyInfo :: String
 keyInfo = "w: up\na: left\ns: down\nd: right\nEsc: quit"
 
 randomTips :: [String]
@@ -109,13 +110,13 @@ renderGame imgResources wSize world =
 		gameAreaSize = (vecX wSize, gameAreaHeight)
 		gameAreaHeight = vecY wSize - statusHeight
 		statusHeight = 100
-		textAreaParams color = TextAreaParams {
+		textAreaParams bgColor = TextAreaParams {
 			textArea_bmpFont = (imgRes_font imgResources),
 			textArea_textParams = TextFieldParams {
 				textFieldParams_size = statusSize,
 				textFieldParams_fontSize = 32
 			},
-			textArea_backgroundColor = color
+			textArea_backgroundColor = bgColor
 		}
 
 statsToText :: World -> String
@@ -135,7 +136,7 @@ renderGameArea imgResources world =
 		,
 		renderDots (world_dots world)
 		,
-		renderGhosts (world_ghosts world)
+		renderGhosts (imgRes_ghost imgResources) (world_ghosts world)
 		,
 		renderPacMan (world_t world) $ (world_pacman world)
 	]
@@ -182,15 +183,23 @@ renderPacMan time pacman =
 				_ -> 0
 				--angle -> error $ "got " ++ show angle
 
-renderGhosts :: [Ghost] -> Picture
-renderGhosts =
-	Pictures . map renderGhost
+renderGhosts :: Picture -> [Ghost] -> Picture
+renderGhosts ghostPic =
+	Pictures . map (renderGhost ghostPic)
 
-renderGhost :: Ghost -> Picture
-renderGhost ghost =
+renderGhost :: Picture -> Ghost -> Picture
+renderGhost ghostPic@(Bitmap ghostWidth ghostHeight _ _) ghost =
 	placeObject ghost $
-	Color green $
-	Polygon $ [(1/2,0), (1,1), (0,1) ]
+	-- Color green $
+	Translate 0.5 0.5 $
+	--Scale `uncurry` (1 |/| (vecMap fromIntegral $ (ghostWidth, ghostHeight))) $
+	Scale scaleFac scaleFac $
+	Scale 1 (-1) $
+	ghostPic
+	--Polygon $ [(1/2,0), (1,1), (0,1) ]
+	where
+		scaleFac = (1/) $ fromIntegral $ max ghostWidth ghostHeight
+renderGhost _ _ = error "renderGhost invalid parameter"
 
 -- (0,0).. (labyrinthSizeOnScreen (world_labyrinth world))
 renderLabyrinth :: Picture -> Picture -> Labyrinth -> Picture
@@ -200,6 +209,7 @@ renderLabyrinth floorTile wallTile lab =
 			Translate `uncurry` (vecMap fromI $ swap index) $
 			drawCell floorTile wallTile territory
 
+labyrinthSizeOnScreen :: Labyrinth -> Size Float
 labyrinthSizeOnScreen labyrinth = swap $ vecMap fromI $ mGetSize $ labyrinth
 
 -- (0,0) .. (1,1)
@@ -215,6 +225,7 @@ drawCell floorTile@(Bitmap floorWidth floorHeight _ _) wallTile@(Bitmap wallWidt
 			Scale `uncurry` (1 |/| (vecMap fromIntegral $ (wallWidth, wallHeight))) $
 			wallTile
 			-- Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
+drawCell _ _ = error "drawCell: invalid parameter"
 
 fitToArea :: Vec Float -> Vec Float -> Picture -> Picture
 fitToArea pos size =
