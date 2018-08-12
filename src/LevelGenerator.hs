@@ -96,12 +96,12 @@ genLabyrinth labSize gridStep =
 			fmap (|+| (vecMap (`div` 2) gridStep)) $
 			mkGrid gridStep (labSize |-| gridStep)
 			:: Grid (Pos Int)
-		traceM $ "grid:\n" ++ toText positions
+		-- traceM $ "grid:\n" ++ toText positions
 		connections <-
 			randomDelEdgesWhile edgeDelCondition $
 			allEdgesOfGrid labSize positions
 			:: m [Edge]
-		traceM $ "connections:\n" ++ show connections
+		-- traceM $ "connections:\n" ++ show connections
 		allPaths <-
 			fmap (map $ pointInSize labSize) $
 			fmap join $
