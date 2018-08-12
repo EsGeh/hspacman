@@ -37,22 +37,22 @@ resolver: lts-8.22
 # will not be run. This is useful for tweaking upstream packages.
 packages:
 - .
-- location:
-   git: https://github.com/EsGeh/sgData.git
-   commit: 7698a5739c30f13fd4c85288cd505acd15e8394d
-- location:
-   git: https://github.com/EsGeh/sgCard.git
-   commit: 27f5f86d9551e7c02beae42a4be0ae5e6908d3b2
-- location:
-   git: https://github.com/EsGeh/gloss.git
-   commit: 72bdafb0ad49511627cb9ea387e112ca4ab8966f
-  subdirs:
-   - gloss
-   - gloss-rendering
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps: []
+extra-deps:
+- location:
+  git: https://github.com/EsGeh/sgData.git
+  commit: 7698a5739c30f13fd4c85288cd505acd15e8394d
+- location:
+  git: https://github.com/EsGeh/sgCard.git
+  commit: 27f5f86d9551e7c02beae42a4be0ae5e6908d3b2
+- location:
+  git: https://github.com/EsGeh/gloss.git
+  commit: 72bdafb0ad49511627cb9ea387e112ca4ab8966f
+  subdirs:
+   - gloss
+   - gloss-rendering
 
 # Override default flag values for local packages and extra-deps
 flags: {}
