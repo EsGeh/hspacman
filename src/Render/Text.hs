@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Render.Text where
 
+import Render.SpriteSheet
 import Vector2D
 import Graphics.Gloss hiding(display)
 
@@ -8,11 +9,18 @@ import Data.Maybe
 import Control.Monad
 
 
-data BitmapFont = BitmapFont {
-	bmpFont_bmp :: BitmapData,
-	bmpFont_size :: Vec Int,
-	bmpFont_charWidth :: Int
+newtype BitmapFont = BitmapFont{
+	fromBitmapFont :: SpriteSheet
 }
+	deriving( Show )
+
+bmpFont_bmp :: BitmapFont -> BitmapData
+bmpFont_bmp = spriteSheet_bmp . fromBitmapFont
+bmpFont_charSize :: BitmapFont -> (Int,Int)
+bmpFont_charSize = spriteSheet_frameSize . fromBitmapFont
+
+loadBitmapFont :: (Int, Int) -> String -> IO BitmapFont
+loadBitmapFont charSize = fmap BitmapFont . loadSpriteSheet charSize
 
 data TextFieldParams = TextFieldParams {
 	textFieldParams_size :: Vec Float,
@@ -43,21 +51,19 @@ renderText ::
 	-> String
 	-> Picture
 renderText bmpFont textFieldParams@TextFieldParams{..} str =
-	--Translate `uncurry` (-textFieldParams_size |/ 2) $
 	Scale fontScale fontScale $
 	Pictures $
 	zipWith positionLines
 	[0..] (map (renderTextLine bmpFont textFieldParams) $ textLines)
 	where
 		positionLines index =
-			Translate 0 (vecY textFieldParams_size - (fromIntegral $ (index+1) * lineHeight))
-		lineHeight = snd $ bmpFont_size bmpFont
+			Translate 0 (vecY textFieldParams_size - (fromIntegral $ (index+1) * charHeight))
 		textLines =
 			join $
 			map (splitLines (floor $ fst textFieldParams_size / (fromI charWidth)*fontScale)) $
 			lines str
-		charWidth = bmpFont_charWidth bmpFont
-		fontScale = textFieldParams_fontSize / (fromI lineHeight)
+		fontScale = textFieldParams_fontSize / (fromI charHeight)
+		(charWidth, charHeight) = bmpFont_charSize bmpFont
 
 -- | renderTextLine bmpFont textFieldParams str renders str to (0,0)..(charWidth * (length str), snd bmpFont_size)
 renderTextLine :: BitmapFont -> TextFieldParams -> String -> Picture
@@ -68,27 +74,32 @@ renderTextLine bmpFont TextFieldParams{..} str =
 	where
 		positionChars :: Int -> Picture -> Picture
 		positionChars index =
-			Translate (fromIntegral $ index * bmpFont_charWidth bmpFont) 0
-		-- (width, height) = bmpFont_size bmpFont
+			Translate
+				(fromIntegral $ index * (fst $ bmpFont_charSize bmpFont))
+				0
 
 -- | renders a single char to (0,0)..(charWidth, snd bmpFont_size)
 renderChar :: BitmapFont -> Char -> Picture
-renderChar BitmapFont{..} char =
-	fromMaybe (Color white $ Polygon $ rect (0,0) (1,1))$
-	charToIndex char >>= \index ->
-	return $
-		Translate ((fromIntegral bmpFont_charWidth)/2) ((fromIntegral $ snd bmpFont_size)/2) $
-		(BitmapSection `uncurry` bmpFont_size) bmpFont_bmp True
-			( index * bmpFont_charWidth, 0)
-			( bmpFont_charWidth, snd bmpFont_size)
+renderChar BitmapFont{ fromBitmapFont=spriteSheet } char =
+	fromMaybe (Color white $ Polygon $ rect (0,0) (1,1)) $
+	fmap (
+		Translate
+			(fromIntegral frameWidth / 2)
+			(fromIntegral frameHeight / 2)
+		.
+		renderSpriteSheet spriteSheet
+	) frame
 	where
-		charToIndex c = 
-			let index = fromEnum c
+		(frameWidth, frameHeight) = spriteSheet_frameSize spriteSheet
+		frame =
+			let index = fromEnum char
 			in
 				if index `elem` [32..122]
 				then return $ index - 32
 				else Nothing
 
+
+fromI :: Int -> Float
 fromI = fromIntegral
 
 splitLines :: Int -> [a] -> [[a]]

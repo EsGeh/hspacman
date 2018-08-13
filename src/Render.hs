@@ -2,10 +2,12 @@
 {-# LANGUAGE RecordWildCards #-}
 module Render(
 	module Render,
-	module Render.Text
+	module Render.Text,
+	module Render.SpriteSheet
 ) where
 
 import Render.Text
+import Render.SpriteSheet
 import GameData
 import Vector2D
 import SGData.Matrix
@@ -14,13 +16,14 @@ import Data.Tuple
 import Control.Monad.Random
 
 import Graphics.Gloss hiding(display)
---import Codec.BMP( BMP, bmpDimensions )
 
 
 data ImageResources = ImageResources {
 	imgRes_wallTile :: Picture,
 	imgRes_floorTile :: Picture,
 	imgRes_ghost :: Picture,
+	imgRes_pacman :: SpriteSheet,
+	--imgRes_pacman :: Picture,
 	imgRes_font :: BitmapFont
 }
 
@@ -138,7 +141,7 @@ renderGameArea imgResources world =
 		,
 		renderGhosts (imgRes_ghost imgResources) (world_ghosts world)
 		,
-		renderPacMan (world_t world) $ (world_pacman world)
+		renderPacMan (world_t world) (imgRes_pacman imgResources) $ (world_pacman world)
 	]
 	where
 		labyrinthSize = labyrinthSizeOnScreen $ world_labyrinth world
@@ -157,19 +160,23 @@ placeObject object =
 	uncurry Translate (obj_pos object) .
 	uncurry Scale (obj_size object)
 
-renderPacMan :: Time -> Pacman -> Picture
-renderPacMan time pacman =
+renderPacMan :: Time -> SpriteSheet -> Pacman -> Picture
+renderPacMan time spriteSheet pacman =
 	placeObject pacman $
 	Translate (1/2) (1/2) $
 	Rotate rotateAngle $
-	Color yellow $
-	ThickArc
-		(mouthAngle/2)
-		(-mouthAngle/2)
-		(1/4) -- radius ?
-		(1/2) -- line width ?
+	Translate (- 1/2) (- 1/2) $
+	Scale scaleFac scaleFac $
+	Translate
+		(fromIntegral bmpWidth / 2)
+		(fromIntegral bmpHeight / 2) $
+	renderSpriteSheet spriteSheet frame
 	where
-		mouthAngle = 90 * (sin $ 5 * time) -- [(-90)..90]
+		frame = floor $ time
+		scaleFac = (1/) $ fromIntegral $ max bmpWidth bmpHeight
+		(bmpWidth, bmpHeight) = spriteSheet_frameSize spriteSheet
+		-- mouthAngle = 90 * (sin $ 5 * time) -- [(-90)..90]
+		rotateAngle :: Float
 		rotateAngle =
 			case vecMap signum $ obj_direction pacman of
 				(1,0) -> 0
@@ -181,24 +188,26 @@ renderPacMan time pacman =
 				(0,-1) -> -270
 				(1,-1) -> -315
 				_ -> 0
-				--angle -> error $ "got " ++ show angle
 
 renderGhosts :: Picture -> [Ghost] -> Picture
 renderGhosts ghostPic =
 	Pictures . map (renderGhost ghostPic)
 
 renderGhost :: Picture -> Ghost -> Picture
-renderGhost ghostPic@(Bitmap ghostWidth ghostHeight _ _) ghost =
-	placeObject ghost $
-	-- Color green $
-	Translate 0.5 0.5 $
-	--Scale `uncurry` (1 |/| (vecMap fromIntegral $ (ghostWidth, ghostHeight))) $
-	Scale scaleFac scaleFac $
-	Scale 1 (-1) $
-	ghostPic
-	--Polygon $ [(1/2,0), (1,1), (0,1) ]
-	where
+renderGhost ghostPic@(Bitmap ghostBmp) ghost =
+	let
+		(ghostWidth, ghostHeight) = bitmapSize $ ghostBmp
 		scaleFac = (1/) $ fromIntegral $ max ghostWidth ghostHeight
+	in
+	-- renderGhost ghostPic@(Bitmap ghostWidth ghostHeight _ _) ghost =
+		placeObject ghost $
+		-- Color green $
+		Translate 0.5 0.5 $
+		--Scale `uncurry` (1 |/| (vecMap fromIntegral $ (ghostWidth, ghostHeight))) $
+		Scale scaleFac scaleFac $
+		Scale 1 (-1) $
+		ghostPic
+		--Polygon $ [(1/2,0), (1,1), (0,1) ]
 renderGhost _ _ = error "renderGhost invalid parameter"
 
 -- (0,0).. (labyrinthSizeOnScreen (world_labyrinth world))
@@ -214,18 +223,25 @@ labyrinthSizeOnScreen labyrinth = swap $ vecMap fromI $ mGetSize $ labyrinth
 
 -- (0,0) .. (1,1)
 drawCell :: Picture -> Picture -> Territory -> Picture
-drawCell floorTile@(Bitmap floorWidth floorHeight _ _) wallTile@(Bitmap wallWidth wallHeight _ _) =
-	Translate 0.5 0.5 .
-	\case
-		Free ->
-			Scale `uncurry` (1 |/| (vecMap fromIntegral $ (floorWidth, floorHeight))) $
-			floorTile
-			-- Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
-		Wall ->
-			Scale `uncurry` (1 |/| (vecMap fromIntegral $ (wallWidth, wallHeight))) $
-			wallTile
-			-- Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
-drawCell _ _ = error "drawCell: invalid parameter"
+drawCell
+	floorTile@(Bitmap floorBmp)
+	wallTile@(Bitmap wallBmp) territory =
+	let
+		(floorWidth, floorHeight) = bitmapSize floorBmp
+		(wallWidth, wallHeight) = bitmapSize wallBmp
+	in
+	-- drawCell floorTile@(Bitmap floorWidth floorHeight _ _) wallTile@(Bitmap wallWidth wallHeight _ _) =
+		Translate 0.5 0.5 $
+		case territory of
+			Free ->
+				Scale `uncurry` ((1,1) |/| (vecMap fromIntegral $ (floorWidth, floorHeight))) $
+				floorTile
+				-- Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
+			Wall ->
+				Scale `uncurry` ((1,1) |/| (vecMap fromIntegral $ (wallWidth, wallHeight))) $
+				wallTile
+				-- Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
+drawCell _ _ _ = error "drawCell: invalid parameter"
 
 fitToArea :: Vec Float -> Vec Float -> Picture -> Picture
 fitToArea pos size =

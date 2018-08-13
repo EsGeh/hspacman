@@ -49,7 +49,7 @@ extra-deps:
   commit: 27f5f86d9551e7c02beae42a4be0ae5e6908d3b2
 - location:
   git: https://github.com/EsGeh/gloss.git
-  commit: 72bdafb0ad49511627cb9ea387e112ca4ab8966f
+  commit: a3d461fff07019e1c31914ddd96245f89ac083ac
   subdirs:
    - gloss
    - gloss-rendering

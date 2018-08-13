@@ -18,7 +18,7 @@ import Data.List
 
 import Lens.Micro.Platform
 
-import Debug.Trace
+-- import Debug.Trace
 
 
 data WorldParams = WorldParams {

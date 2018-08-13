@@ -21,7 +21,7 @@ import Control.Monad.Random
 import Control.Monad.State.Strict
 import Lens.Micro.Platform
 import System.Random( getStdGen )
-import qualified Codec.BMP as BMP
+-- import qualified Codec.BMP as BMP
 -- import Codec.BMP( readBMP )
 
 imgPath :: String
@@ -81,16 +81,9 @@ loadImageResources =
 		imgRes_wallTile <- loadBMP $ imgPath ++ "/wall_tile.bmp"
 		imgRes_floorTile <- loadBMP $ imgPath ++ "/floor_tile.bmp"
 		imgRes_ghost <- loadBMP $ imgPath ++ "/ghost.bmp"
-		fontBMP <-
-			fmap (either (error . ("bmp error: "++) . show) id ) $ BMP.readBMP $ imgPath ++ "/outline_24x32.bmp"
-		putStrLn $ ("font info: " ++) . show $ BMP.bmpFileHeader fontBMP
-		putStrLn $ ("font info: " ++) . show $ BMP.bmpBitmapInfo fontBMP
-		let fontImg = bitmapDataOfBMP fontBMP
-		let imgRes_font = Render.BitmapFont {
-			Render.bmpFont_bmp = fontImg,
-			Render.bmpFont_charWidth = 24,
-			Render.bmpFont_size = BMP.bmpDimensions fontBMP
-			}
+		--imgRes_pacman <- loadBMP $ imgPath ++ "/pacman.bmp"
+		imgRes_pacman <- Render.loadSpriteSheet (32,32) $ imgPath ++ "/pacman.bmp"
+		imgRes_font <- Render.loadBitmapFont (24,32) $ imgPath ++ "/outline_24x32.bmp"
 		return $ Render.ImageResources {
 			..
 		}
