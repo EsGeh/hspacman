@@ -172,10 +172,9 @@ renderPacMan time spriteSheet pacman =
 		(fromIntegral bmpHeight / 2) $
 	renderSpriteSheet spriteSheet frame
 	where
-		frame = floor $ time
+		frame = floor $ time * 4
 		scaleFac = (1/) $ fromIntegral $ max bmpWidth bmpHeight
 		(bmpWidth, bmpHeight) = spriteSheet_frameSize spriteSheet
-		-- mouthAngle = 90 * (sin $ 5 * time) -- [(-90)..90]
 		rotateAngle :: Float
 		rotateAngle =
 			case vecMap signum $ obj_direction pacman of
