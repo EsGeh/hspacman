@@ -1,10 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 module GameData where
 
 import Vector2D
 import SGData.Matrix
 
 import Prelude hiding(Left,Right)
+import Data.Maybe
+import Data.Tuple( swap )
 import Lens
 import Lens.Micro.Platform
 
@@ -12,6 +15,8 @@ import Lens.Micro.Platform
 -- |Directions in Labyrinth
 data Direction = Up | Down | Right | Left deriving (Eq, Show)
 type Movement = Direction
+
+type Path a = [Pos a]
 
 --type Area a = (Pos a, Size a)
 
@@ -74,15 +79,24 @@ data Statistics = Statistics {
 
 type CurrentKeys = [Direction]
 
+type DebugInfo = [String]
+{-
 data DebugInfo = DbgInf {
 	info :: String
 } deriving(Show)
+-}
 
 type Level = Int
 type Points = Int
 
+-- |ATTENTION:
+-- |rows represent up-down, columns left-right on screen.
+-- |This means if you have screen corrds (x,y)
+-- |you might wanna look up `mGet (y,x) labyrinth`
 type Labyrinth = Matrix Territory
-data Territory = Free | Wall deriving(Show,Eq)
+
+data Territory = Free | Wall
+	deriving(Read, Show, Eq, Ord)
 instance Enum Territory where
 	toEnum int = case int of
 		0 -> Free
@@ -101,13 +115,19 @@ data Object objState = Object {
 } deriving( Show, Eq, Ord )
 
 data GhostState = GhostState {
-	ghost_dir_history :: [(Direction, Float)]
-} deriving(Show)
+	-- a path the ghost is currently trying to follow
+	ghost_pathToDest :: Path Int
+} deriving(Read, Show, Eq, Ord)
 
 type Dot = Object ()
 type Fruit = Object ()
 type Pacman = Object ()
 type Ghost = Object GhostState
+
+makeLensesWith lensRules' ''World
+makeLensesWith lensRules' ''Statistics
+makeLensesWith lensRules' ''Object
+makeLensesWith lensRules' ''GhostState
 
 -- default objects
 defObj :: Pos Float -> Object ()
@@ -120,14 +140,14 @@ defObj pos = Object{
 }
 defGhost :: Pos Float -> Ghost
 defGhost pos =
-	(defObj pos){ obj_state = GhostState{ ghost_dir_history = [ (Right, 0)] } }
+	set (obj_state_l) (GhostState []) $
+	defObj pos
 
---data UIState = Playing | Menu | GameOver | Won deriving(Show)
+objCenter :: Object objState -> Pos Float
+objCenter Object{..} =
+	obj_pos |+| 0.5 *| obj_size
 
-makeLensesWith lensRules' ''World
-makeLensesWith lensRules' ''Statistics
-makeLensesWith lensRules' ''Object
-makeLensesWith lensRules' ''GhostState
+path_dest = listToMaybe . reverse
 
 directionsToSpeed :: Num a => [Direction] -> Vec a
 directionsToSpeed = foldl (|+|) (0,0) . map directionToSpeed
@@ -154,14 +174,32 @@ speedToDirection speed =
 	in
 		xDir ++ yDir
 
+{-
 class ToText a where
 	toText :: a -> String
+-}
 
-instance (Show a) => ToText (Matrix a) where
-	toText = showMatr
+instance (Show a) => Show (Matrix a) where
+	show = showMatr
 
 showMatr :: Show a => Matrix a -> String
 showMatr =
 	unlines .
 	map (foldl (\x y -> x ++ "|" ++ y) "" . map show) .
 	mGetAllRows
+
+-- |a view on the area of surrounding terrain
+nextFields :: Size Int -> Pos Int -> Labyrinth -> [(Pos Int, Territory)]
+nextFields size pos labyrinth =
+	map (\pos -> (pos, mGet (swap pos) labyrinth)) $
+	surroundingPositions (mGetSize labyrinth) size pos
+
+-- |positions around a given viewpoint
+surroundingPositions :: Size Int -> Size Int -> Pos Int -> [Pos Int]
+surroundingPositions fieldSize size pos =
+	do
+		deltaX <- [-vecX size..vecX size]
+		deltaY <- [-vecY size..vecY size]
+		return $
+			pointInSize fieldSize $
+			pos |+| (deltaX, deltaY)

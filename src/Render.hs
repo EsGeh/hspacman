@@ -112,7 +112,7 @@ renderGame imgResources wSize world =
 		statusSize = (vecX wSize, statusHeight)
 		gameAreaSize = (vecX wSize, gameAreaHeight)
 		gameAreaHeight = vecY wSize - statusHeight
-		statusHeight = 100
+		statusHeight = 160
 		textAreaParams bgColor = TextAreaParams {
 			textArea_bmpFont = (imgRes_font imgResources),
 			textArea_textParams = TextFieldParams {
@@ -124,10 +124,13 @@ renderGame imgResources wSize world =
 
 statsToText :: World -> String
 statsToText World{ world_statistics = Statistics{..}, ..} =
-	unlines . map concat $
-	[ [ "level: ", show world_level ]
-	, [ "points: ", show world_points, " left: ", show $ length world_dots ]
-	]
+	unlines $
+		map concat
+		[ [ "level: ", show world_level ]
+		, [ "points: ", show world_points, " left: ", show $ length world_dots ]
+		]
+		++
+		world_dbgInfo
 
 -- (0,0).. (labyrinthSizeOnScreen (world_labyrinth world))
 renderGameArea :: ImageResources -> World -> Picture

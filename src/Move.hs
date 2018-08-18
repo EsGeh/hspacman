@@ -1,5 +1,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 -- {-# LANGUAGE Rank2Types #-}
 module Move where
 
@@ -11,7 +14,10 @@ import Prelude hiding(Left,Right)
 
 import Data.Tuple
 import Data.Maybe
+import Data.List
 import Control.Monad.Random
+import Control.Monad.Writer
+import Debug.Trace
 
 import Lens.Micro.Platform
 
@@ -19,14 +25,13 @@ import Lens.Micro.Platform
 moveWorld :: MonadRandom m => DeltaT -> World -> m GameState
 moveWorld deltaT =
 	fmap (
-		maybeEndGame
-		.
-		setDbgText 
-		.
-		movePacman deltaT
+		maybeEndGame .
+		(\(world, dbgText) -> setDbgText dbgText world)
 	)
 	.
-	(moveGhosts deltaT)
+	runWriterT
+	.
+	(return . movePacman deltaT <=< moveGhosts deltaT)
 	.
 	over world_t_l (+ deltaT)
 	where
@@ -37,27 +42,88 @@ moveWorld deltaT =
 					if isGameOver world
 					then GameOver $ world_statistics world
 					else Playing world
-		setDbgText world =
-			set world_dbgInfo_l (DbgInf dbgText) world
-			where
-				dbgText = concat $
-					[ "userInput: ", show $ world_userInput world, "\n"
-					, "pos: ", show (obj_pos $ world_pacman world), "\n"
-					]
+		setDbgText txt world =
+				over world_dbgInfo_l (take 3 . (map $ head) . group . (txt:)) world
 
-{-
-moveGhosts :: StdGen -> DeltaT -> World -> State World
-moveGhosts rndGen dt world =
-	let (newWorld, newRnd) =
-		runRand `flip` (world_randomGen world) $
-		traverseOf world_ghosts_l (mapM $ moveGhost world dt) world
-	in
-		newWorld{ world_randomGen = newRnd }
--}
-
-moveGhosts :: forall m . MonadRandom m => DeltaT -> World -> m World
+moveGhosts :: forall m . (MonadRandom m, MonadWriter String m) => DeltaT -> World -> m World
 moveGhosts dt world = traverseOf world_ghosts_l (mapM $ moveGhost world dt) world
 
+moveGhost :: forall m . (MonadRandom m, MonadWriter String m) => World -> DeltaT -> Ghost -> m Ghost
+moveGhost world@World{..} dt ghost@Object{obj_state=GhostState{..}, ..} =
+	case ghost_pathToDest of
+		[]  ->
+			let start = vecMap floor $ objCenter ghost
+			in
+			do
+				newPath <-
+					fmap (drop 1) $
+					uniform $
+					filter (not . null) $
+					map (findPath world_labyrinth start) $
+					chooseDest world ghost
+				--traceM $ show newPath
+				moveGhost world dt $ set obj_state_l (GhostState newPath) ghost
+		(nextDest:restPath) ->
+			let dir = (vecMap fromIntegral nextDest |+| (0.5,0.5)) |-| objCenter ghost
+			in
+				if vec_length dir < 0.05
+				then 
+					moveGhost world dt $ set obj_state_l (GhostState restPath) ghost
+				else
+					do
+						--tell $ show dir
+						return $
+							moveObjSimple torusSize (normalizeDir dir) (world_ghostSpeed * dt) ghost
+	where
+		torusSize = (fromIntegral $ mGetWidth world_labyrinth, fromIntegral $ mGetHeight world_labyrinth)
+
+chooseDest :: World -> Ghost -> [Pos Int]
+chooseDest World{..} ghost@Object{obj_state=GhostState{..}, ..} =
+	let 
+		logicalPos = vecMap floor $ objCenter ghost
+	in
+		map fst $
+		filter ((==Free) . snd) $
+		nextFields (3,3) logicalPos world_labyrinth
+
+findPath :: Labyrinth -> Pos Int -> Pos Int -> [Pos Int]
+findPath labyrinth start dest =
+	let
+		roughDirection@(xDir, yDir) = dest |-| start
+		maybeNextStep =
+			fmap (vecMap signum) $
+			maximumOnSafe (vec_length . vecMap fromIntegral) $
+			filter openInDirection $
+			filter (/=(0,0)) $
+			[(xDir,0), (0,yDir)]
+		openInDirection :: Speed Int -> Bool
+		openInDirection dir =
+			mGet (swap $ start |+| (vecMap signum dir)) labyrinth == Free
+	in
+		-- trace (concat ["s=", show start, ", d=", show dest, " next=", show maybeNextStep, "\n"]) $
+		case maybeNextStep of
+			Nothing -> []
+			Just nextStep ->
+				let nextPos = start |+| nextStep
+				in
+					if nextPos == dest
+					then start : [dest]
+					else
+						start : findPath labyrinth nextPos dest
+
+maximumOnSafe f =
+	maximumBySafe $ \x y -> f x `compare` f y
+
+minimumOnSafe f =
+	minimumBySafe $ \x y -> f x `compare` f y
+
+maximumBySafe _ [] = Nothing
+maximumBySafe f l = Just $ maximumBy f l
+
+minimumBySafe _ [] = Nothing
+minimumBySafe f l = Just $ minimumBy f l
+
+{-
 moveGhost :: forall m . MonadRandom m => World -> DeltaT -> Ghost -> m Ghost
 moveGhost world dt ghost =
 	do
@@ -83,6 +149,12 @@ moveGhost world dt ghost =
 						uniform $ possibleDirs
 		torusSize = (fromIntegral $ mGetWidth labyrinth, fromIntegral $ mGetHeight labyrinth)
 		labyrinth = world_labyrinth world
+-}
+
+possibleDirectionsClever :: Labyrinth -> Object st -> [Direction]
+possibleDirectionsClever lab obj =
+	filter (\dir -> not $ willCollideWithLabyrinth lab (directionToSpeed $ dir) 0.4 obj)
+	allDirs
 
 possibleDirections :: Labyrinth -> DeltaT -> Object st -> [Direction]
 possibleDirections lab deltaT obj =

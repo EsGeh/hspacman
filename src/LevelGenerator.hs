@@ -3,7 +3,8 @@
 {-# LANGUAGE TupleSections #-}
 module LevelGenerator(
 	WorldParams(..),
-	genWorld
+	genWorld,
+	genLabyrinth
 ) where
 
 import GameData --hiding(Direction)
@@ -18,7 +19,7 @@ import Data.List
 
 import Lens.Micro.Platform
 
--- import Debug.Trace
+--import Debug.Trace
 
 
 data WorldParams = WorldParams {
@@ -69,7 +70,7 @@ genWorld WorldParams{..} =
 					map (vecMap fromIntegral) $
 					dotPositions,
 				world_fruits= [],
-				world_dbgInfo = DbgInf{ info = "" },
+				world_dbgInfo = [],
 				world_userInput = [],
 				world_t = 0
 				--world_randomGen = rndGen
@@ -96,18 +97,17 @@ genLabyrinth labSize gridStep =
 			fmap (|+| (vecMap (`div` 2) gridStep)) $
 			mkGrid gridStep (labSize |-| gridStep)
 			:: Grid (Pos Int)
-		-- traceM $ "grid:\n" ++ toText positions
+		--traceM $ "grid:\n" ++ show positions
 		connections <-
 			randomDelEdgesWhile edgeDelCondition $
 			allEdgesOfGrid labSize positions
 			:: m [Edge]
-		-- traceM $ "connections:\n" ++ show connections
-		allPaths <-
-			fmap (map $ pointInSize labSize) $
-			fmap join $
-			mapM (uncurry connectionRoute) connections :: m [Pos Int]
+		--traceM $ "connections:\n" ++ show connections
+		let allPaths =
+			map (map (pointInSize labSize) . uncurry connectionRoute) connections :: [[Pos Int]]
+		--traceM $ "allPaths:\n" ++ show allPaths
 		return $
-			foldl (.) id (map `flip` allPaths $ \pos -> mSet pos Free) $
+			foldl (.) id (map `flip` join allPaths $ \pos -> mSet (swap pos) Free) $
 			massiveField labSize
 	where
 		edgeDelCondition :: [Edge] -> Edge -> Bool
@@ -145,7 +145,7 @@ edgesFromPos size =
 -- (|+|) <$> [(vecX size,0), (0,vecY size), size] <*> [0..(size-1)]
 allEdgesOfGrid :: Size Int -> Grid (Pos Int) -> [(Pos Int, Pos Int)]
 allEdgesOfGrid size grid =
-	nub $
+	-- nub $
 	foldl (++) [] $
 	mapWithIndex `flip` grid  $ \index pos ->
 	do
@@ -157,8 +157,8 @@ allEdgesOfGrid size grid =
 			let
 				normalizedIndex = pointInSize (mGetSize grid) index
 			in
-				(if vecY normalizedIndex < vecY index then (|+| (0,vecY size)) else id) $
-				(if vecX normalizedIndex < vecX index then (|+| (vecX size,0)) else id) $
+				(if snd normalizedIndex < snd index then (|+| (vecX size,0)) else id) $
+				(if fst normalizedIndex < fst index then (|+| (0,vecY size)) else id) $
 				(mGet `flip` grid) $
 				normalizedIndex
 		neighbourIndices' point =
@@ -170,7 +170,7 @@ type Grid a = Matrix a
 neighbourIndices :: Pos Int -> [Pos Int]
 neighbourIndices point =
 	do
-		movement <- [(0,), (,0) ] <*> [1, (-1)]
+		movement <- [(0,1), (1,0) ]
 		return $
 			point |+| movement
 
@@ -181,9 +181,9 @@ mkGrid (stepX, stepY) size =
 		rows :: [[Vec Int]]
 		rows =
 			do
-				x <- [0,stepX..vecX size-1]
+				y <- [0,stepY..vecY size-1]
 				return $ do
-					y <- [0,stepY..vecY size-1]
+					x <- [0,stepX..vecX size-1]
 					return $ (x,y)
 
 -- a field with wall on all cells 
@@ -193,9 +193,8 @@ massiveField (width,height) =
 	where
 		line = replicate width Wall :: [Territory]
 
-connectionRoute :: MonadRandom m => Vec Int -> Vec Int -> m [Vec Int]
+connectionRoute :: Vec Int -> Vec Int -> [Vec Int]
 connectionRoute l r =
-	return $
 	lineRaster start stop
 	`union`
 	if (abs $ lineGradient start stop) <= 1

@@ -9,6 +9,12 @@ import Data.Fixed
 type Pos a = Vec a
 type Speed a = Vec a
 type Size a = Vec a
+data Rect a
+	= Rect {
+		rect_pos :: Pos a,
+		rect_size :: Size a
+	}
+	deriving( Read, Show, Eq, Ord )
 
 (*|) :: Num t => t -> (t, t) -> (t, t)
 scalar *| vec = (scalar * (vecX vec), scalar * (vecY vec))
@@ -38,7 +44,7 @@ rect pos (w,h) =
 distance :: Vec Float -> Vec Float -> Float
 distance p1 p2 = sqrt $ (vecX p1 - vecX p2)^^(2 :: Int) + (vecX p1 - vecX p2)^^(2 :: Int)
 
-pointInSize :: Integral a => Size a -> Pos a -> Size a
+pointInSize :: Integral a => Size a -> Pos a -> Pos a
 pointInSize (width,height) (x,y)  = (x `mod` width, y `mod` height)
 
 pointInSizeF :: Size Float -> Pos Float -> Size Float
