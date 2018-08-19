@@ -23,7 +23,6 @@ data ImageResources = ImageResources {
 	imgRes_floorTile :: Picture,
 	imgRes_ghost :: Picture,
 	imgRes_pacman :: SpriteSheet,
-	--imgRes_pacman :: Picture,
 	imgRes_font :: BitmapFont
 }
 
@@ -201,15 +200,11 @@ renderGhost ghostPic@(Bitmap ghostBmp) ghost =
 		(ghostWidth, ghostHeight) = bitmapSize $ ghostBmp
 		scaleFac = (1/) $ fromIntegral $ max ghostWidth ghostHeight
 	in
-	-- renderGhost ghostPic@(Bitmap ghostWidth ghostHeight _ _) ghost =
 		placeObject ghost $
-		-- Color green $
 		Translate 0.5 0.5 $
-		--Scale `uncurry` (1 |/| (vecMap fromIntegral $ (ghostWidth, ghostHeight))) $
 		Scale scaleFac scaleFac $
 		Scale 1 (-1) $
 		ghostPic
-		--Polygon $ [(1/2,0), (1,1), (0,1) ]
 renderGhost _ _ = error "renderGhost invalid parameter"
 
 -- (0,0).. (labyrinthSizeOnScreen (world_labyrinth world))
@@ -232,17 +227,14 @@ drawCell
 		(floorWidth, floorHeight) = bitmapSize floorBmp
 		(wallWidth, wallHeight) = bitmapSize wallBmp
 	in
-	-- drawCell floorTile@(Bitmap floorWidth floorHeight _ _) wallTile@(Bitmap wallWidth wallHeight _ _) =
 		Translate 0.5 0.5 $
 		case territory of
 			Free ->
 				Scale `uncurry` ((1,1) |/| (vecMap fromIntegral $ (floorWidth, floorHeight))) $
 				floorTile
-				-- Color (greyN 0.8) $ Polygon $ rect posCell sizeCell
 			Wall ->
 				Scale `uncurry` ((1,1) |/| (vecMap fromIntegral $ (wallWidth, wallHeight))) $
 				wallTile
-				-- Color (greyN 0.2) $ Polygon $ rect posCell sizeCell
 drawCell _ _ _ = error "drawCell: invalid parameter"
 
 fitToArea :: Vec Float -> Vec Float -> Picture -> Picture

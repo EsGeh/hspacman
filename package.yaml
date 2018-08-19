@@ -1,0 +1,39 @@
+name:                hspacman
+version:             0.1.0.0
+synopsis: an experiment based on the classical Namco Pacman Game
+#description:
+homepage:            https://github.com/EsGeh/hspacman.git#readme
+license:             BSD3
+author:              juffel, wans hurst, EsGeh
+maintainer:          SamuelGfroerer@googlemail.com
+# copyright:           2018 Author name here
+category:            Game
+extra-source-files:
+- README.md
+
+dependencies:
+  - base >= 4.7 && < 5
+  - sgData
+  - gloss == 1.12.0.0
+  - random
+  - MonadRandom
+  - mtl
+  - transformers
+  - microlens-platform
+  - template-haskell
+  - bmp
+  - containers
+  - fgl
+
+executables:
+  hspacman:
+    source-dirs:      src
+    main:             Main.hs
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -Wall
+      - -fno-warn-tabs
+      - -fprof-auto
+      - -fprof-cafs

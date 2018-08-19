@@ -21,8 +21,7 @@ import Control.Monad.Random
 import Control.Monad.State.Strict
 import Lens.Micro.Platform
 import System.Random( getStdGen )
--- import qualified Codec.BMP as BMP
--- import Codec.BMP( readBMP )
+
 
 imgPath :: String
 imgPath = "res"
@@ -70,10 +69,6 @@ withRandomGen x =
 		let (res, newState) = runRand x rndGen
 		put newState
 		return res
-	{-
-	state $ \rndGen ->
-	runRand `flip` rndGen x
-	-}
 
 loadImageResources :: IO Render.ImageResources
 loadImageResources =
@@ -81,7 +76,6 @@ loadImageResources =
 		imgRes_wallTile <- loadBMP $ imgPath ++ "/wall_tile.bmp"
 		imgRes_floorTile <- loadBMP $ imgPath ++ "/floor_tile.bmp"
 		imgRes_ghost <- loadBMP $ imgPath ++ "/ghost.bmp"
-		--imgRes_pacman <- loadBMP $ imgPath ++ "/pacman.bmp"
 		imgRes_pacman <- Render.loadSpriteSheet (32,32) $ imgPath ++ "/pacman.bmp"
 		imgRes_font <- Render.loadBitmapFont (24,32) $ imgPath ++ "/outline_24x32.bmp"
 		return $ Render.ImageResources {
@@ -138,11 +132,10 @@ worldParamsFromDifficulty level =
 	LevelGenerator.WorldParams{
 		LevelGenerator.worldParams_level = level,
 		LevelGenerator.worldParams_size =
-			(worldSize, worldSize),
+			(worldSize*2, worldSize),
 			--(floor $ fromIntegral worldSize*3/2, worldSize),
 		LevelGenerator.worldParams_gridStep =
-			(3,3),
-		--LevelGenerator.worldParams_wallRatio = wallRatio,
+			(2,3),
 		LevelGenerator.worldParams_ghostCount =
 			floor $ ghostRatio * (fromIntegral $ worldSize*worldSize),
 		LevelGenerator.worldParams_pacmanSpeed = speed,

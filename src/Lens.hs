@@ -3,6 +3,7 @@ module Lens where
 import Lens.Micro.Platform
 import Language.Haskell.TH.Syntax
 
+-- |I want lenses for field `field` named `field_l`:
 lensRules' :: LensRules
 lensRules' =
 	lensRules & lensField .~ \_ _ field ->

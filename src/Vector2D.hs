@@ -6,6 +6,7 @@ module Vector2D(
 import SGData.Vector2D hiding ( (*|), (|*) )
 import Data.Fixed
 
+
 type Pos a = Vec a
 type Speed a = Vec a
 type Size a = Vec a
@@ -15,6 +16,7 @@ data Rect a
 		rect_size :: Size a
 	}
 	deriving( Read, Show, Eq, Ord )
+
 
 (*|) :: Num t => t -> (t, t) -> (t, t)
 scalar *| vec = (scalar * (vecX vec), scalar * (vecY vec))

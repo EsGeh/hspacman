@@ -22,6 +22,7 @@ import Lens.Micro.Platform
 --import Debug.Trace
 
 
+-- |arguments for the level generator
 data WorldParams = WorldParams {
 	worldParams_level :: Int,
 	worldParams_size :: Size Int,
@@ -32,6 +33,7 @@ data WorldParams = WorldParams {
 	worldParams_ghostsSpeed :: Float
 }
 	deriving( Show, Read, Ord, Eq)
+
 
 genWorld :: MonadRandom m => WorldParams -> m World
 genWorld WorldParams{..} =
@@ -78,6 +80,7 @@ genWorld WorldParams{..} =
 	where
 		dotSize = (0.2, 0.2)
 
+-- | `randomSubSet count list` == subset of `l` with `count` elements
 randomSubSet :: (MonadRandom m, Eq a) => Int -> [a] -> m [a]
 randomSubSet count list
 	| count == 0 = return []
@@ -244,36 +247,6 @@ lineGradient start stop =
 	in
 		yDiff / xDiff
 
-{-
-randomNonEmptyPartition :: MonadRandom m => Int -> [a] -> m [[a]]
-randomNonEmptyPartition count l =
-	foldl (>=>) return (map addToRandomPartition l) $
-	replicate count []
-	where
-		addToRandomPartition :: MonadRandom m => a -> [[a]] -> m [[a]]
-		addToRandomPartition x partition =
-			do
-				selectedPartition <- uniform [0..(length partition-1)]
-				return $ changeListElem (x:) selectedPartition partition
--}
-
-{-
-randomPartition :: MonadRandom m => Int -> [a] -> m [[a]]
-randomPartition count l =
-	foldl (>=>) return (map addToRandomPartition l) $
-	replicate count []
-	where
-		addToRandomPartition :: MonadRandom m => a -> [[a]] -> m [[a]]
-		addToRandomPartition x partition =
-			do
-				selectedPartition <- uniform [0..(length partition-1)]
-				return $ changeListElem (x:) selectedPartition partition
-
-changeListElem :: (a -> a) -> Int -> [a] -> [a]
-changeListElem f index (x:xs)
-	| index == 0 	= (f x):xs
-	| otherwise 	= x:(changeListElem f (index-1) xs)
--}
-
+-- |abbreviation:
 fromI :: (Integral i, Num a) => i -> a
 fromI = fromIntegral
