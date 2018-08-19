@@ -5,9 +5,14 @@ import Vector2D
 import SGData.Matrix
 
 import Prelude hiding(Left,Right)
+import Data.Tuple( swap )
 import Lens
 import Lens.Micro.Platform
 
+
+------------------------------------------
+-- game state:
+------------------------------------------
 
 data GameState
 	= Playing World
@@ -48,15 +53,16 @@ type Points = Int
 -- |rows represent up-down, columns left-right on screen.
 -- |This means if you have screen corrds (x,y)
 -- |you might wanna look up `mGet (y,x) labyrinth`
-type Labyrinth = Matrix Territory
+newtype Labyrinth = Labyrinth{ fromLabyrinth :: Matrix Terrain }
+	-- deriving( Foldable )
 
-data Territory = Free | Wall
+data Terrain = Free | Wall
 	deriving(Read, Show, Eq, Ord)
-instance Enum Territory where
+instance Enum Terrain where
 	toEnum int = case int of
 		0 -> Free
 		1 -> Wall
-		_ -> error "Territory enum error"
+		_ -> error "Terrain enum error"
 	fromEnum ter = case ter of
 		Free -> 0
 		Wall -> 1
@@ -96,3 +102,54 @@ makeLensesWith lensRules' ''World
 makeLensesWith lensRules' ''Statistics
 makeLensesWith lensRules' ''Object
 makeLensesWith lensRules' ''GhostState
+makeLensesWith lensRules' ''Labyrinth
+
+instance Show Labyrinth where
+	show = showMatr . fromLabyrinth
+
+showMatr :: Show a => Matrix a -> String
+showMatr =
+	unlines .
+	map (foldl (\x y -> x ++ "|" ++ y) "" . map show) .
+	mGetAllRows
+
+-- Labyrinth functions:
+
+labyrinth_fromRows :: [[Terrain]] -> Maybe Labyrinth
+labyrinth_fromRows =
+	fmap Labyrinth . mFromListRow
+
+-- |ATTENTION: coordinates in (x, y)
+labyrinth_get :: Pos Int -> Labyrinth -> Terrain
+labyrinth_get pos =
+	mGet (swap pos) . fromLabyrinth
+
+-- |ATTENTION: coordinates in (x, y)
+labyrinth_set :: Pos Int -> Terrain -> Labyrinth -> Labyrinth
+labyrinth_set pos terrain =
+	over fromLabyrinth_l $ mSet (swap pos) terrain
+
+-- |ATTENTION: (x-Size, y-Size) = (#cols, #rows)
+labyrinth_size :: Labyrinth -> Size Int
+labyrinth_size =
+	swap . mGetSize . fromLabyrinth
+
+labyrinth_width :: Labyrinth -> Int
+labyrinth_width =
+	vecX . labyrinth_size
+
+labyrinth_height :: Labyrinth -> Int
+labyrinth_height =
+	vecY . labyrinth_size
+
+labyrinth_allPositions :: Labyrinth -> [Pos Int]
+labyrinth_allPositions lab =
+	do
+		x <- [0..(labyrinth_width lab)-1]
+		y <- [0..(labyrinth_height lab)-1]
+		return (x,y)
+
+labyrinth_mapWithIndex :: (Pos Int -> Terrain -> b) -> Labyrinth -> Matrix b
+labyrinth_mapWithIndex f lab =
+	mapWithIndex `flip` (fromLabyrinth lab) $ \pos x ->
+		f (swap pos) x

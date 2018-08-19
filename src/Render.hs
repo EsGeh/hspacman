@@ -10,9 +10,7 @@ import Render.Text
 import Render.SpriteSheet
 import GameData
 import Vector2D
-import SGData.Matrix
 import qualified Data.Foldable as F -- enables folds over matrices
-import Data.Tuple
 import Control.Monad.Random
 
 import Graphics.Gloss hiding(display)
@@ -211,15 +209,15 @@ renderGhost _ _ = error "renderGhost invalid parameter"
 renderLabyrinth :: Picture -> Picture -> Labyrinth -> Picture
 renderLabyrinth floorTile wallTile lab =
 	Pictures $
-		F.foldr (:) [] $ mapWithIndex `flip` lab $ \index territory ->
-			Translate `uncurry` (vecMap fromI $ swap index) $
+		F.foldr (:) [] $ labyrinth_mapWithIndex `flip` lab $ \pos territory ->
+			Translate `uncurry` (vecMap fromI pos) $
 			drawCell floorTile wallTile territory
 
 labyrinthSizeOnScreen :: Labyrinth -> Size Float
-labyrinthSizeOnScreen labyrinth = swap $ vecMap fromI $ mGetSize $ labyrinth
+labyrinthSizeOnScreen = vecMap fromI . labyrinth_size
 
 -- (0,0) .. (1,1)
-drawCell :: Picture -> Picture -> Territory -> Picture
+drawCell :: Picture -> Picture -> Terrain -> Picture
 drawCell
 	floorTile@(Bitmap floorBmp)
 	wallTile@(Bitmap wallBmp) territory =

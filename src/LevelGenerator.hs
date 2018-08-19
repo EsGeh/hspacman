@@ -10,7 +10,7 @@ module LevelGenerator(
 import GameData --hiding(Direction)
 import Vector2D
 import Prelude hiding(Left,Right)
-import Data.Tuple
+import Data.Tuple( swap )
 
 import SGData.Matrix
 import Control.Monad.Random
@@ -19,7 +19,7 @@ import Data.List
 
 import Lens.Micro.Platform
 
---import Debug.Trace
+import Debug.Trace
 
 
 -- |arguments for the level generator
@@ -39,10 +39,10 @@ genWorld :: MonadRandom m => WorldParams -> m World
 genWorld WorldParams{..} =
 	do
 		labyrinth <- genLabyrinth worldParams_size worldParams_gridStep
+		traceM $ "labyrinth:" ++ show labyrinth
 		let allFreePositions =
-			map swap $ 
-			filter ((==Free) . flip mGet labyrinth) $
-			mGetAllIndex labyrinth
+			filter ((==Free) . (labyrinth_get `flip` labyrinth)) $
+			labyrinth_allPositions labyrinth
 		pacmanPos <-
 			uniform $
 			allFreePositions
@@ -97,20 +97,20 @@ genLabyrinth ::
 genLabyrinth labSize gridStep = 
 	do
 		let positions =
-			fmap (|+| (vecMap (`div` 2) gridStep)) $
+			(|+| vecMap (`div` 2) gridStep) <$>
 			mkGrid gridStep (labSize |-| gridStep)
-			:: Grid (Pos Int)
-		--traceM $ "grid:\n" ++ show positions
+				:: Grid (Pos Int)
+		traceM $ "grid:\n" ++ show positions
 		connections <-
 			randomDelEdgesWhile edgeDelCondition $
 			allEdgesOfGrid labSize positions
 			:: m [Edge]
-		--traceM $ "connections:\n" ++ show connections
+		traceM $ "connections:\n" ++ show connections
 		let allPaths =
 			map (map (pointInSize labSize) . uncurry connectionRoute) connections :: [[Pos Int]]
-		--traceM $ "allPaths:\n" ++ show allPaths
+		-- traceM $ "allPaths:\n" ++ show allPaths
 		return $
-			foldl (.) id (map `flip` join allPaths $ \pos -> mSet (swap pos) Free) $
+			foldl (.) id (map `flip` join allPaths $ \pos -> labyrinth_set pos Free) $
 			massiveField labSize
 	where
 		edgeDelCondition :: [Edge] -> Edge -> Bool
@@ -124,7 +124,7 @@ randomDelEdgesWhile cond edges =
 	do
 		mNewGraph <- randomDeleteEdge cond edges
 		case mNewGraph of
-			Nothing -> return $ edges
+			Nothing -> return edges
 			Just x -> randomDelEdgesWhile cond x
 
 randomDeleteEdge :: MonadRandom m => ([Edge] -> Edge -> Bool) -> [Edge] -> m (Maybe [Edge])
@@ -142,33 +142,31 @@ edgesFromPos :: Size Int -> Pos Int -> [Edge] -> [Edge]
 edgesFromPos size =
 	(\pos -> filter $ \edge -> pointInSize size (fst edge) == pos || pointInSize size (snd edge) == pos)
 	.
-	(pointInSize size)
+	pointInSize size
 
 -- an edge over the border of the torus is represented by one node in
 -- (|+|) <$> [(vecX size,0), (0,vecY size), size] <*> [0..(size-1)]
 allEdgesOfGrid :: Size Int -> Grid (Pos Int) -> [(Pos Int, Pos Int)]
 allEdgesOfGrid size grid =
 	-- nub $
-	foldl (++) [] $
-	mapWithIndex `flip` grid  $ \index pos ->
-	do
-		neighbour <- lookupIndex <$> neighbourIndices' index :: [Pos Int]
-		return $ 
-			if pos < neighbour then (pos, neighbour) else (neighbour, pos)
+	concat $
+	mapWithIndex edgesToNeighbours grid
 	where
+		edgesToNeighbours index pos =
+			do
+			neighbour <- lookupIndex <$> neighbourIndices' index :: [Pos Int]
+			return $ 
+				if pos < neighbour then (pos, neighbour) else (neighbour, pos)
 		lookupIndex index =
 			let
 				normalizedIndex = pointInSize (mGetSize grid) index
 			in
 				(if snd normalizedIndex < snd index then (|+| (vecX size,0)) else id) $
 				(if fst normalizedIndex < fst index then (|+| (0,vecY size)) else id) $
-				(mGet `flip` grid) $
-				normalizedIndex
+				mGet normalizedIndex grid
 		neighbourIndices' point =
 			filter (\x -> vecX x >= 0 && vecY x >= 0) $
 			neighbourIndices point
-
-type Grid a = Matrix a
 
 neighbourIndices :: Pos Int -> [Pos Int]
 neighbourIndices point =
@@ -176,6 +174,11 @@ neighbourIndices point =
 		movement <- [(0,1), (1,0) ]
 		return $
 			point |+| movement
+
+type Grid a = Matrix a
+
+instance (Show a) => Show (Matrix a) where
+	show = showMatr
 
 mkGrid :: Vec Int  -> Size Int -> Grid (Vec Int)
 mkGrid (stepX, stepY) size =
@@ -187,14 +190,14 @@ mkGrid (stepX, stepY) size =
 				y <- [0,stepY..vecY size-1]
 				return $ do
 					x <- [0,stepX..vecX size-1]
-					return $ (x,y)
+					return (x,y)
 
 -- a field with wall on all cells 
 massiveField :: Size Int -> Labyrinth
 massiveField (width,height) =
-	fromMaybe (error "internal error") $ mFromListRow $ replicate height line
+	fromMaybe (error "internal error") $ labyrinth_fromRows $ replicate height line
 	where
-		line = replicate width Wall :: [Territory]
+		line = replicate width Wall :: [Terrain]
 
 connectionRoute :: Vec Int -> Vec Int -> [Vec Int]
 connectionRoute l r =

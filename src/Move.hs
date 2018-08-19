@@ -8,13 +8,11 @@ module Move where
 
 import GameData
 import Vector2D
-import SGData.Matrix
 import qualified Utils
 import qualified Move.Collision as Coll
 
 import Prelude hiding(Left,Right)
 
-import Data.Tuple
 import Data.Maybe
 import Data.List
 import Control.Monad.Random
@@ -76,7 +74,7 @@ moveGhost world@World{..} dt ghost@Object{obj_state=GhostState{..}, ..} =
 						return $
 							moveObjSimple torusSize (normalizeDir dir) (world_ghostSpeed * dt) ghost
 	where
-		torusSize = (fromIntegral $ mGetWidth world_labyrinth, fromIntegral $ mGetHeight world_labyrinth)
+		torusSize = (fromIntegral $ labyrinth_width world_labyrinth, fromIntegral $ labyrinth_height world_labyrinth)
 
 chooseDest :: World -> Ghost -> [Pos Int]
 chooseDest World{..} ghost@Object{obj_state=GhostState{..}, ..} =
@@ -99,7 +97,7 @@ findPath labyrinth start dest =
 			[(xDir,0), (0,yDir)]
 		openInDirection :: Speed Int -> Bool
 		openInDirection dir =
-			mGet (swap $ start |+| (vecMap signum dir)) labyrinth == Free
+			labyrinth_get (start |+| (vecMap signum dir)) labyrinth == Free
 	in
 		-- trace (concat ["s=", show start, ", d=", show dest, " next=", show maybeNextStep, "\n"]) $
 		case maybeNextStep of
@@ -145,7 +143,7 @@ movePacman dt world =
 		userInput = world_userInput world :: [Direction]
 		speed =
 			world_pacmanSpeed world
-		torusSize = (fromIntegral $ mGetWidth labyrinth, fromIntegral $ mGetHeight labyrinth)
+		torusSize = vecMap fromIntegral $ labyrinth_size labyrinth
 		labyrinth = world_labyrinth world
 
 maybeEatDot :: World -> World

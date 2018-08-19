@@ -7,16 +7,10 @@ module GameData(
 
 import GameData.Types
 import Vector2D
-import SGData.Matrix
 
 import Prelude hiding(Left,Right)
 import Data.Maybe
-import Data.Tuple( swap )
 import Lens.Micro.Platform
-
-------------------------------------------
--- game state:
-------------------------------------------
 
 
 ------------------------------------------
@@ -50,20 +44,11 @@ class ToText a where
 	toText :: a -> String
 -}
 
-instance (Show a) => Show (Matrix a) where
-	show = showMatr
-
-showMatr :: Show a => Matrix a -> String
-showMatr =
-	unlines .
-	map (foldl (\x y -> x ++ "|" ++ y) "" . map show) .
-	mGetAllRows
-
 -- |a view on the area of surrounding terrain
-nextFields :: Size Int -> Pos Int -> Labyrinth -> [(Pos Int, Territory)]
+nextFields :: Size Int -> Pos Int -> Labyrinth -> [(Pos Int, Terrain)]
 nextFields size pos labyrinth =
-	map (\p -> (p, mGet (swap p) labyrinth)) $
-	surroundingPositions (mGetSize labyrinth) size pos
+	map (\p -> (p, labyrinth_get p labyrinth)) $
+	surroundingPositions (labyrinth_size labyrinth) size pos
 
 -- |positions around a given viewpoint
 surroundingPositions :: Size Int -> Size Int -> Pos Int -> [Pos Int]
