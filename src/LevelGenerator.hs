@@ -19,7 +19,7 @@ import Data.List
 
 import Lens.Micro.Platform
 
-import Debug.Trace
+-- import Debug.Trace
 
 
 -- |arguments for the level generator
@@ -39,7 +39,7 @@ genWorld :: MonadRandom m => WorldParams -> m World
 genWorld WorldParams{..} =
 	do
 		labyrinth <- genLabyrinth worldParams_size worldParams_gridStep
-		traceM $ "labyrinth:" ++ show labyrinth
+		-- traceM $ "labyrinth:\n" ++ show labyrinth
 		let allFreePositions =
 			filter ((==Free) . (labyrinth_get `flip` labyrinth)) $
 			labyrinth_allPositions labyrinth
@@ -100,12 +100,12 @@ genLabyrinth labSize gridStep =
 			(|+| vecMap (`div` 2) gridStep) <$>
 			mkGrid gridStep (labSize |-| gridStep)
 				:: Grid (Pos Int)
-		traceM $ "grid:\n" ++ show positions
+		-- traceM $ "grid:\n" ++ show positions
 		connections <-
 			randomDelEdgesWhile edgeDelCondition $
 			allEdgesOfGrid labSize positions
 			:: m [Edge]
-		traceM $ "connections:\n" ++ show connections
+		-- traceM $ "connections:\n" ++ show connections
 		let allPaths =
 			map (map (pointInSize labSize) . uncurry connectionRoute) connections :: [[Pos Int]]
 		-- traceM $ "allPaths:\n" ++ show allPaths

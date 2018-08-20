@@ -14,3 +14,6 @@ maximumBySafe f l = Just $ maximumBy f l
 
 minimumBySafe _ [] = Nothing
 minimumBySafe f l = Just $ minimumBy f l
+
+minimumOn f = minimumBy $ \x y -> f x `compare` f y
+maximumOn f = maximumBy $ \x y -> f x `compare` f y

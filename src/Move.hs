@@ -47,43 +47,59 @@ moveWorld deltaT =
 moveGhosts :: forall m . (MonadRandom m, MonadWriter String m) => DeltaT -> World -> m World
 moveGhosts dt world = traverseOf world_ghosts_l (mapM $ moveGhost world dt) world
 
+-- |ghosts move an "paths". When dest is reached, a new goal and path is chosen for the ghost
 moveGhost :: forall m . (MonadRandom m, MonadWriter String m) => World -> DeltaT -> Ghost -> m Ghost
 moveGhost world@World{..} dt ghost@Object{obj_state=GhostState{..}, ..} =
 	case ghost_pathToDest of
 		[]  ->
 			let start = vecMap floor $ objCenter ghost
 			in
-			do
+				do
 				newPath <-
-					fmap (drop 1) $
+					fmap (drop 1) $ -- skip the first entry, since this is where the ghost already is
 					uniform $
 					filter (not . null) $
 					map (findPath world_labyrinth start) $
-					chooseDest world ghost
-				--traceM $ show newPath
+					possibleGhostDestinations world ghost
+				-- traceM $ concat [ "start: ", show start, " path: ", show newPath ]
 				moveGhost world dt $ set obj_state_l (GhostState newPath) ghost
 		(nextDest:restPath) ->
-			let dir = (vecMap fromIntegral nextDest |+| (0.5,0.5)) |-| objCenter ghost
+			let
+				dir =
+					(vecMap fromIntegral nextDestFixed |+| (0.5,0.5))
+					|-|
+					objCenter ghost
+				nextDestFixed =
+					Utils.minimumOn (vec_length . vecMap fromIntegral . (|-| logicalPos) :: Pos Int -> Float) $
+					[nextDest, nextDestInTorus]
+				nextDestInTorus = pointInSize (labyrinth_size world_labyrinth) nextDest
+				logicalPos = vecMap floor $ objCenter ghost
 			in
-				if vec_length dir < 0.05
+				if
+					((<0.05) . vec_length) $
+					dir
 				then 
+					-- trace (concat [ "dir = ", show dir ]) $
 					moveGhost world dt $ set obj_state_l (GhostState restPath) ghost
 				else
 					do
-						--tell $ show dir
+						-- tell $ show $ vecMap (roundTo 10) dir
 						return $
 							moveObjSimple torusSize (normalizeDir dir) (world_ghostSpeed * dt) ghost
 	where
-		torusSize = (fromIntegral $ labyrinth_width world_labyrinth, fromIntegral $ labyrinth_height world_labyrinth)
+		torusSize = vecMap fromIntegral $ labyrinth_size world_labyrinth
 
-chooseDest :: World -> Ghost -> [Pos Int]
-chooseDest World{..} ghost@Object{obj_state=GhostState{..}, ..} =
+roundTo :: Int -> Float -> Float
+roundTo prec = (/fromIntegral prec) . fromInteger . floor . (*fromIntegral prec)
+
+possibleGhostDestinations :: World -> Ghost -> [Pos Int]
+possibleGhostDestinations World{..} ghost@Object{obj_state=GhostState{..}, ..} =
 	let 
 		logicalPos = vecMap floor $ objCenter ghost
 	in
 		map fst $
 		filter ((==Free) . snd) $
-		nextFields (3,3) logicalPos world_labyrinth
+		nextFields (4,4) logicalPos world_labyrinth
 
 findPath :: Labyrinth -> Pos Int -> Pos Int -> [Pos Int]
 findPath labyrinth start dest =
@@ -95,20 +111,20 @@ findPath labyrinth start dest =
 			filter openInDirection $
 			filter (/=(0,0)) $
 			[(xDir,0), (0,yDir)]
+		-- |going 1 step into `dir` is possible?
 		openInDirection :: Speed Int -> Bool
 		openInDirection dir =
-			labyrinth_get (start |+| (vecMap signum dir)) labyrinth == Free
+			labyrinth_get (pointInSize fieldSize $ start |+| (vecMap signum dir)) labyrinth == Free
+		fieldSize = labyrinth_size labyrinth
 	in
 		-- trace (concat ["s=", show start, ", d=", show dest, " next=", show maybeNextStep, "\n"]) $
-		case maybeNextStep of
-			Nothing -> []
-			Just nextStep ->
-				let nextPos = start |+| nextStep
-				in
-					if nextPos == dest
-					then start : [dest]
-					else
-						start : findPath labyrinth nextPos dest
+		maybe [] `flip` maybeNextStep $ \nextStep ->
+			let nextPos = start |+| nextStep
+			in
+				if nextPos == dest
+				then start : [dest]
+				else
+					start : findPath labyrinth nextPos dest
 
 possibleDirectionsClever :: Labyrinth -> Object st -> [Direction]
 possibleDirectionsClever lab obj =

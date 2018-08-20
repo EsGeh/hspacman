@@ -45,19 +45,21 @@ class ToText a where
 -}
 
 -- |a view on the area of surrounding terrain
+-- BEWARE: positions may be outside of the field:
 nextFields :: Size Int -> Pos Int -> Labyrinth -> [(Pos Int, Terrain)]
 nextFields size pos labyrinth =
-	map (\p -> (p, labyrinth_get p labyrinth)) $
-	surroundingPositions (labyrinth_size labyrinth) size pos
+	map (\p -> (p, labyrinth_get (pointInSize size p) labyrinth)) $
+	surroundingPositions size pos
 
 -- |positions around a given viewpoint
-surroundingPositions :: Size Int -> Size Int -> Pos Int -> [Pos Int]
-surroundingPositions fieldSize size pos =
+-- BEWARE: positions may be outside of the field:
+surroundingPositions :: Size Int -> Pos Int -> [Pos Int]
+surroundingPositions size pos =
 	do
 		deltaX <- [-vecX size..vecX size]
 		deltaY <- [-vecY size..vecY size]
 		return $
-			pointInSize fieldSize $
+			-- pointInSize fieldSize $
 			pos |+| (deltaX, deltaY)
 
 opposite :: Direction -> Direction
@@ -108,4 +110,3 @@ speedToDirection speed =
 			_ -> error "internal error"
 	in
 		xDir ++ yDir
-
